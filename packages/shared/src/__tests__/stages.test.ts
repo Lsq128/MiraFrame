@@ -8,7 +8,7 @@ describe("nextStage", () => {
   });
 
   it("returns null for the last stage", () => {
-    expect(nextStage("add_audio")).toBeNull();
+    expect(nextStage("review")).toBeNull();
   });
 
   it("all stages except last have a next stage", () => {
