@@ -17,14 +17,5 @@ services:
     ports:
       - "6379:6379"
 
-  sidecar:
-    build:
-      context: ./sidecar
-      dockerfile: Dockerfile
-    ports:
-      - "8001:8001"
-    environment:
-      - PYTHONUNBUFFERED=1
-
 volumes:
   dev-pgdata:

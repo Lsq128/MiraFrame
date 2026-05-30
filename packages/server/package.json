@@ -30,6 +30,9 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.3",
+    "@vladmandic/face-api": "^1.7.15",
+    "canvas": "^3.2.3",
+    "edge-tts-universal": "^1.4.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

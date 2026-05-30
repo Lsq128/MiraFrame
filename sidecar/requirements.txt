@@ -1,9 +1,0 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.0
-insightface==0.7.3
-onnxruntime==1.18.0
-opencv-python-headless==4.10.0
-edge-tts==6.1.14
-numpy==1.26.4
-pydantic==2.9.0
-python-multipart==0.0.12
