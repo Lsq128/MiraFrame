@@ -1,7 +1,10 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import { CoreModule } from "./core";
+import { DatabaseModule } from "./db";
+import { ServicesModule } from "./services";
+import { WsModule } from "./ws";
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true })],
+  imports: [CoreModule, DatabaseModule, ServicesModule, WsModule],
 })
 export class AppModule {}
