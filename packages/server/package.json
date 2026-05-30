@@ -11,15 +11,21 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langchain/core": "^1.0.0",
+    "@langchain/langgraph": "^1.0.0",
+    "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/platform-socket.io": "^11.1.24",
     "@nestjs/websockets": "^11.1.24",
+    "@openoii/agent": "workspace:*",
     "@openoii/shared": "workspace:*",
+    "bullmq": "^5.77.6",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
+    "ioredis": "^5.11.0",
     "postgres": "^3.4.9",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
@@ -27,6 +33,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@nestjs/testing": "^11.1.24",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
