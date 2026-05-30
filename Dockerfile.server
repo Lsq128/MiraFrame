@@ -1,0 +1,32 @@
+FROM node:22-alpine AS base
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
+WORKDIR /app
+
+# Dependencies
+COPY pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/
+COPY packages/agent/package.json packages/agent/
+COPY packages/server/package.json packages/server/
+RUN pnpm install --frozen-lockfile --prod false
+
+# Source
+COPY packages/shared/ packages/shared/
+COPY packages/agent/ packages/agent/
+COPY packages/server/ packages/server/
+
+# Build shared -> agent -> server
+RUN pnpm --filter @openoii/shared build
+RUN pnpm --filter @openoii/agent build
+RUN pnpm --filter @openoii/server build
+
+# Production image
+FROM node:22-alpine AS production
+WORKDIR /app
+COPY --from=base /app/node_modules/.pnpm ./node_modules/.pnpm
+COPY --from=base /app/packages/shared/dist ./packages/shared/dist
+COPY --from=base /app/packages/agent/dist ./packages/agent/dist
+COPY --from=base /app/packages/server/dist ./packages/server/dist
+COPY --from=base /app/packages/server/package.json ./packages/server/
+
+EXPOSE 3000
+CMD ["node", "packages/server/dist/main.js"]
