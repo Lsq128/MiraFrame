@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { useProjectStore } from "@/stores/projectStore";
+import { useProjectStore } from "../stores/projectStore";
 import type { Project } from "@openoii/shared";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 
 const makeProject = (overrides: Partial<Project> = {}): Project => ({
   id: "00000000-0000-0000-0000-000000000001",

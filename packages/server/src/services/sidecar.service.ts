@@ -24,7 +24,7 @@ export class SidecarService {
       const text = await response.text();
       throw new Error(`Face detection failed: ${text}`);
     }
-    return response.json();
+    return response.json() as Promise<FaceDetectResult>;
   }
 
   async synthesizeSpeech(text: string, voice?: string): Promise<Buffer> {
@@ -42,6 +42,6 @@ export class SidecarService {
 
   async healthCheck(): Promise<{ status: string; face_model_available: boolean }> {
     const response = await fetch(`${SIDECAR_URL}/health`);
-    return response.json();
+    return response.json() as Promise<{ status: string; face_model_available: boolean }>;
   }
 }
