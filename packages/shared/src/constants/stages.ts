@@ -15,6 +15,7 @@ export const PHASE2_STAGES = [
   "compose_approval",
   "compose_merge",
   "add_audio",
+  "review",
 ] as const;
 
 export type Phase2Stage = (typeof PHASE2_STAGES)[number];
@@ -36,6 +37,7 @@ export const STAGE_ORDER: Record<Phase2Stage, number> = {
   compose_approval: 13,
   compose_merge: 14,
   add_audio: 15,
+  review: 16,
 };
 
 export function nextStage(current: Phase2Stage): Phase2Stage | null {

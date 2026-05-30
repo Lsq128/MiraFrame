@@ -1,0 +1,195 @@
+import { interrupt } from "@langchain/langgraph";
+import type { Phase2StateType } from "../state.js";
+import type { AgentContext } from "../agents/base.js";
+import { OutlineAgent } from "../agents/outline.js";
+import { PlanAgent } from "../agents/plan.js";
+import { RenderAgent } from "../agents/render.js";
+import { ComposeAgent } from "../agents/compose.js";
+import { CriticAgent } from "../agents/critic.js";
+import { ReviewRuleEngine } from "../agents/review.js";
+
+// Factory to create agent instances
+const outlineAgent = new OutlineAgent();
+const planAgent = new PlanAgent();
+const renderAgent = new RenderAgent();
+const composeAgent = new ComposeAgent();
+const criticAgent = new CriticAgent();
+const reviewEngine = new ReviewRuleEngine();
+
+// Mock context for now - will be replaced with real context from Nest.js
+function createNodeCtx(ctx?: Partial<AgentContext>): AgentContext {
+  return {
+    projectId: ctx?.projectId ?? 0,
+    runId: ctx?.runId ?? 0,
+    threadId: ctx?.threadId ?? "",
+    sendMessage: ctx?.sendMessage ?? (async () => { void 0; }),
+    sendThinking: ctx?.sendThinking ?? (async () => { void 0; }),
+    callLlm: ctx?.callLlm ?? (async () => "{}"),
+  };
+}
+
+export async function planOutlineNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  return outlineAgent.run(createNodeCtx(), state);
+}
+
+export async function planCharactersNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  return planAgent.runCharacters(createNodeCtx(), state);
+}
+
+export async function planShotsNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  return planAgent.runShots(createNodeCtx(), state);
+}
+
+export async function renderCharactersNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  return renderAgent.runCharacters(createNodeCtx(), state);
+}
+
+export async function renderShotsNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  return renderAgent.runShots(createNodeCtx(), state);
+}
+
+export async function composeVideosNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  return composeAgent.runVideos(createNodeCtx(), state);
+}
+
+export async function composeMergeNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  return composeAgent.runMerge(createNodeCtx(), state);
+}
+
+export async function addAudioNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  return composeAgent.runAddAudio(createNodeCtx(), state);
+}
+
+// Approval nodes - use interrupt() for human-in-the-loop
+export function outlineApprovalNode(state: Phase2StateType): Partial<Phase2StateType> {
+  const approved = interrupt({
+    question: "Approve the story outline?",
+    gate: "outline_approval",
+    current_stage: state.currentStage,
+  });
+  return {
+    currentStage: "outline_approval",
+    approvalHistory: { ...state.approvalHistory, outline: approved ? "approved" : "rejected" },
+  };
+}
+
+export function charactersApprovalNode(state: Phase2StateType): Partial<Phase2StateType> {
+  const approved = interrupt({
+    question: "Approve the character designs?",
+    gate: "characters_approval",
+  });
+  return {
+    currentStage: "characters_approval",
+    approvalHistory: { ...state.approvalHistory, characters: approved ? "approved" : "rejected" },
+  };
+}
+
+export function shotsApprovalNode(state: Phase2StateType): Partial<Phase2StateType> {
+  const approved = interrupt({ question: "Approve the shot scripts?", gate: "shots_approval" });
+  return {
+    currentStage: "shots_approval",
+    approvalHistory: { ...state.approvalHistory, shots: approved ? "approved" : "rejected" },
+  };
+}
+
+export function characterImagesApprovalNode(state: Phase2StateType): Partial<Phase2StateType> {
+  const approved = interrupt({ question: "Approve the character images?", gate: "character_images_approval" });
+  return {
+    currentStage: "character_images_approval",
+    approvalHistory: { ...state.approvalHistory, characterImages: approved ? "approved" : "rejected" },
+  };
+}
+
+export function shotImagesApprovalNode(state: Phase2StateType): Partial<Phase2StateType> {
+  const approved = interrupt({ question: "Approve the shot images?", gate: "shot_images_approval" });
+  return {
+    currentStage: "shot_images_approval",
+    approvalHistory: { ...state.approvalHistory, shotImages: approved ? "approved" : "rejected" },
+  };
+}
+
+export function composeApprovalNode(state: Phase2StateType): Partial<Phase2StateType> {
+  const approved = interrupt({ question: "Approve the final composition?", gate: "compose_approval" });
+  return {
+    currentStage: "compose_approval",
+    approvalHistory: { ...state.approvalHistory, compose: approved ? "approved" : "rejected" },
+  };
+}
+
+export async function critiqueCharacterImagesNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  return criticAgent.reviewCharacters(createNodeCtx(), state);
+}
+
+export async function critiqueShotImagesNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  return criticAgent.reviewShots(createNodeCtx(), state);
+}
+
+export async function reviewNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  return reviewEngine.run(createNodeCtx(), state);
+}
+
+// ── Routing functions ──
+type RouteKey = string;
+
+export function routeFromStart(state: Phase2StateType): RouteKey {
+  return state.currentStage || "plan_outline";
+}
+
+export function routeAfterOutlineApproval(state: Phase2StateType): RouteKey {
+  if (state.reviewRequested) return "review";
+  const approved = state.approvalHistory?.outline;
+  return approved === "approved" ? "plan_characters" : "plan_outline";
+}
+
+export function routeAfterCharactersApproval(state: Phase2StateType): RouteKey {
+  if (state.reviewRequested) return "review";
+  return state.approvalHistory?.characters === "approved" ? "plan_shots" : "review";
+}
+
+export function routeAfterShotsApproval(state: Phase2StateType): RouteKey {
+  if (state.reviewRequested) return "review";
+  return state.approvalHistory?.shots === "approved" ? "render_characters" : "review";
+}
+
+export function routeAfterCharacterImagesApproval(state: Phase2StateType): RouteKey {
+  if (state.reviewRequested) return "review";
+  return "critique_character_images";
+}
+
+export function routeAfterShotImagesApproval(state: Phase2StateType): RouteKey {
+  if (state.reviewRequested) return "review";
+  return "critique_shot_images";
+}
+
+export function routeAfterComposeVideos(_state: Phase2StateType): RouteKey {
+  return "compose_merge";
+}
+
+export function routeAfterComposeMerge(_state: Phase2StateType): RouteKey {
+  return "add_audio";
+}
+
+export function routeAfterComposeApproval(state: Phase2StateType): RouteKey {
+  if (state.reviewRequested) return "review";
+  return state.approvalHistory?.compose === "approved" ? "__end__" : "review";
+}
+
+export function routeAfterCritiqueCharacterImages(state: Phase2StateType): RouteKey {
+  const scores = state.critiqueScores || {};
+  const round = state.critiqueRound || 1;
+  const scoreKey = `characters_round_${round}`;
+  const score = scores[scoreKey] ?? 0;
+  return (score >= 7 || round >= 2) ? "render_shots" : "render_characters";
+}
+
+export function routeAfterCritiqueShotImages(state: Phase2StateType): RouteKey {
+  const scores = state.critiqueScores || {};
+  const round = state.critiqueRound || 1;
+  const scoreKey = `shots_round_${round}`;
+  const score = scores[scoreKey] ?? 0;
+  return (score >= 7 || round >= 2) ? "compose_videos" : "render_shots";
+}
+
+export function routeAfterReview(state: Phase2StateType): RouteKey {
+  return state.routeStage || "plan_outline";
+}
