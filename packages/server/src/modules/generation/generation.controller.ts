@@ -1,12 +1,12 @@
 import { Controller, Post, Param, Body, HttpCode, HttpStatus, Inject } from "@nestjs/common";
 import Redis from "ioredis";
 import { REDIS_CLIENT } from "../../redis";
-import { AgentService } from "../../agent";
+import { AgentService } from "../../agent/agent.service";
 
 @Controller("api/v1/projects/:projectId")
 export class GenerationController {
   constructor(
-    private readonly agentService: AgentService,
+    @Inject(AgentService) private readonly agentService: AgentService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 

@@ -24,7 +24,7 @@ export class AgentService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @Inject(REDIS_SUBSCRIBER) private readonly redisSub: Redis,
     @Inject(DRIZZLE) private readonly db: Db,
-    private readonly wsGateway: WsGateway,
+    @Inject(WsGateway) private readonly wsGateway: WsGateway,
   ) {}
 
   async startGeneration(input: GenerationInput): Promise<void> {

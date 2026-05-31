@@ -20,8 +20,8 @@ export class AgentProcessor extends WorkerHost {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @Inject(REDIS_SUBSCRIBER) private readonly redisSub: Redis,
     @Inject(DRIZZLE) private readonly db: Db,
-    private readonly wsGateway: WsGateway,
-    private readonly textService: TextService,
+    @Inject(WsGateway) private readonly wsGateway: WsGateway,
+    @Inject(TextService) private readonly textService: TextService,
   ) {
     super();
   }

@@ -1,12 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Inject } from "@nestjs/common";
 import { FaceService, FaceDetectResult } from "./face.service";
 import { TtsService } from "./tts.service";
 
 @Injectable()
 export class SidecarService {
   constructor(
-    private readonly faceService: FaceService,
-    private readonly ttsService: TtsService,
+    @Inject(FaceService) private readonly faceService: FaceService,
+    @Inject(TtsService) private readonly ttsService: TtsService,
   ) {}
 
   async detectFaces(imageBase64: string): Promise<FaceDetectResult> {
