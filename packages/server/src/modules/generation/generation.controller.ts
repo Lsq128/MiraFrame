@@ -1,9 +1,14 @@
-import { Controller, Post, Param, Body, HttpCode, HttpStatus } from "@nestjs/common";
+import { Controller, Post, Param, Body, HttpCode, HttpStatus, Inject } from "@nestjs/common";
+import Redis from "ioredis";
+import { REDIS_CLIENT } from "../../redis";
 import { AgentService } from "../../agent";
 
 @Controller("api/v1/projects/:projectId")
 export class GenerationController {
-  constructor(private readonly agentService: AgentService) {}
+  constructor(
+    private readonly agentService: AgentService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+  ) {}
 
   @Post("generate")
   @HttpCode(HttpStatus.ACCEPTED)
@@ -47,17 +52,14 @@ export class GenerationController {
     @Param("runId") runId: string,
     @Body() body: { confirm?: boolean; feedback?: string },
   ) {
-    // Publish confirm signal to Redis to resume the interrupted graph
-    const Redis = (await import("ioredis")).default;
-    const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379/0");
-    await redis.publish(
+    // Use injected Redis client (no manual connection)
+    await this.redis.publish(
       `generation:${projectId}:${runId}`,
       JSON.stringify({
         action: body.confirm ? "confirm" : "cancel",
         feedback: body.feedback,
       }),
     );
-    redis.disconnect();
     return { status: "resumed" };
   }
 

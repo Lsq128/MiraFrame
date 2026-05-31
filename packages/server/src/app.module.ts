@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { CoreModule } from "./core";
 import { DatabaseModule } from "./db";
 import { RedisModule } from "./redis";
@@ -16,11 +17,14 @@ import { BullModule } from "@nestjs/bullmq";
     ServicesModule,
     WsModule,
     // BullMQ for background jobs
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST || "localhost",
-        port: parseInt(process.env.REDIS_PORT || "6379"),
-      },
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get<string>("app.redisHost") || "localhost",
+          port: config.get<number>("app.redisPort") || 6379,
+        },
+      }),
     }),
     AgentModule,
     GenerationModule,

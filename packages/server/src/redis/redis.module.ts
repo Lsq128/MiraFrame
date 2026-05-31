@@ -1,4 +1,5 @@
 import { Module, Global } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 
 export const REDIS_CLIENT = "REDIS_CLIENT";
@@ -9,15 +10,17 @@ export const REDIS_SUBSCRIBER = "REDIS_SUBSCRIBER";
   providers: [
     {
       provide: REDIS_CLIENT,
-      useFactory: () => {
-        const url = process.env.REDIS_URL || "redis://localhost:6379/0";
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const url = config.get<string>("app.redisUrl") || config.get<string>("REDIS_URL") || "redis://localhost:6379/0";
         return new Redis(url, { maxRetriesPerRequest: null });
       },
     },
     {
       provide: REDIS_SUBSCRIBER,
-      useFactory: () => {
-        const url = process.env.REDIS_URL || "redis://localhost:6379/0";
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const url = config.get<string>("app.redisUrl") || config.get<string>("REDIS_URL") || "redis://localhost:6379/0";
         return new Redis(url, { maxRetriesPerRequest: null });
       },
     },
