@@ -2,7 +2,7 @@
 
 <div align="center">
   <p><strong>故事想法 → 多智能体协作 → 漫剧成片</strong></p>
-  <p>基于 <strong>LangGraph.js v1.x</strong> 的 AI 漫剧生成平台 — 纯 TypeScript 重构版</p>
+  <p>基于 <strong>LangGraph.js v1.x</strong> 的 AI 漫剧生成平台</p>
 
   <p>
     <img src="https://img.shields.io/badge/TypeScript-5.5+-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
@@ -14,29 +14,13 @@
   </p>
 </div>
 
-openOii-ts 是 [openOii](https://github.com/your-org/openOii) 的纯 TypeScript 重构版本。将原项目的 Python FastAPI + LangGraph Python 全面迁移至 **Nest.js + LangGraph.js v1.x**，采用 pnpm monorepo 架构，实现前后端类型共享、关注点分离。
+openOii-ts 是一个 AI 漫剧生成平台，基于 **Nest.js + LangGraph.js v1.x**，采用 pnpm monorepo 架构，实现前后端类型共享、关注点分离。
 
 > [!NOTE]
 > 这是一个 **LangGraph 学习 / 演示项目**，不适合直接用于工业生产环境。
 
 ---
 
-## 与旧版对比
-
-| | 旧版 openOii (Python) | 新版 openOii-ts |
-|---|---|---|
-| **语言** | Python + TypeScript 异构 | **纯 TypeScript** 全栈 |
-| **后端框架** | FastAPI | **Nest.js 11** |
-| **Agent 编排** | LangGraph Python 1.0 | **LangGraph.js v1.x** |
-| **ORM** | SQLModel / SQLAlchemy | **Drizzle ORM** |
-| **类型系统** | Pydantic ↔ TS 手动同步 | **@openoii/shared** Zod 单一数据源 |
-| **UI 组件库** | DaisyUI 4 | **shadcn/ui** |
-| **状态管理** | 单个巨型 editorStore | **5 领域 Stores** |
-| **包管理** | uv + pnpm 分离 | **pnpm monorepo** |
-| **人脸检测** | Python InsightFace | **@vladmandic/face-api** (TF.js) |
-| **TTS** | Python edge-tts | **edge-tts-universal** (纯 TS) |
-
----
 
 ## 架构总览
 
