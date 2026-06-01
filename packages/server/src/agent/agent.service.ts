@@ -27,25 +27,57 @@ export class AgentService {
     @Inject(WsGateway) private readonly wsGateway: WsGateway,
   ) {}
 
-  async startGeneration(input: GenerationInput): Promise<void> {
-    // Update agent run status in DB
+  async startGeneration(input: Omit<GenerationInput, "runId" | "threadId">): Promise<number> {
+    // INSERT — let DB auto-generate the serial id
+    const [row] = await this.db
+      .insert(schema.agentRuns)
+      .values({
+        projectId: input.projectId,
+        status: "queued",
+        progress: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning({ id: schema.agentRuns.id });
+
+    if (!row) throw new Error("Failed to create agent run");
+    const runId = row.id;
+    const threadId = `thread-${input.projectId}-${runId}`;
+
+    // Update with threadId
     await this.db
       .update(schema.agentRuns)
-      .set({ status: "running", updatedAt: new Date() })
-      .where(eq(schema.agentRuns.id, input.runId));
+      .set({ threadId, updatedAt: new Date() })
+      .where(eq(schema.agentRuns.id, runId));
 
     // Notify frontend
     this.wsGateway.sendToProject(input.projectId, "run_started", {
-      run_id: input.runId,
+      run_id: runId,
       project_id: input.projectId,
       stage: input.targetStage || "plan_outline",
       progress: 0,
     });
 
     // Enqueue the graph execution job
-    await this.generationQueue.add("execute-graph", input, {
-      jobId: `generation:${input.projectId}:${input.runId}`,
-    });
+    const fullInput: GenerationInput = { ...input, runId, threadId };
+    try {
+      await this.generationQueue.add("execute-graph", fullInput, {
+        jobId: `generation:${input.projectId}:${runId}`,
+      });
+      await this.db
+        .update(schema.agentRuns)
+        .set({ status: "running", updatedAt: new Date() })
+        .where(eq(schema.agentRuns.id, runId));
+    } catch (err) {
+      console.error("Failed to enqueue generation job:", err);
+      await this.db
+        .update(schema.agentRuns)
+        .set({ status: "failed", error: String(err), updatedAt: new Date() })
+        .where(eq(schema.agentRuns.id, runId));
+      throw err;
+    }
+
+    return runId;
   }
 
   async cancelGeneration(projectId: number, runId: number): Promise<void> {

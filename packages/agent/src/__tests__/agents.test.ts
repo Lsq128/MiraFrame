@@ -15,6 +15,9 @@ function mockCtx(overrides?: Partial<AgentContext>): AgentContext {
     sendMessage: async () => { void 0; },
     sendThinking: async () => { void 0; },
     callLlm: async () => "{}",
+    saveOutline: async () => { void 0; },
+    createCharacter: async () => ({ id: 1 }),
+    createShot: async () => ({ id: 1 }),
     ...overrides,
   };
 }

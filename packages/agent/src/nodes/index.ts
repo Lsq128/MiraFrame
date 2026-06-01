@@ -16,48 +16,72 @@ const composeAgent = new ComposeAgent();
 const criticAgent = new CriticAgent();
 const reviewEngine = new ReviewRuleEngine();
 
-// Mock context for now - will be replaced with real context from Nest.js
-function createNodeCtx(ctx?: Partial<AgentContext>): AgentContext {
+// Module-scoped context — set by the Nest.js processor before graph execution.
+// This allows real sendMessage / sendThinking / callLlm to be injected at runtime
+// without polluting the serializable LangGraph state.
+let _nodeCtx: AgentContext | null = null;
+
+/** Call from the Nest.js AgentProcessor before invoking the graph. */
+export function setNodeContext(ctx: AgentContext): void {
+  _nodeCtx = ctx;
+  console.log(`[agent:ctx] Context set — project=${ctx.projectId} run=${ctx.runId}`);
+}
+
+/** Call after graph execution to clean up. */
+export function clearNodeContext(): void {
+  _nodeCtx = null;
+}
+
+function getNodeCtx(): AgentContext {
+  if (_nodeCtx) return _nodeCtx;
+  // Fallback — warn loudly so we catch missing setNodeContext() calls
+  console.warn("[agent:ctx] WARNING — using fallback mock context. Graph output will be empty!");
   return {
-    projectId: ctx?.projectId ?? 0,
-    runId: ctx?.runId ?? 0,
-    threadId: ctx?.threadId ?? "",
-    sendMessage: ctx?.sendMessage ?? (async () => { void 0; }),
-    sendThinking: ctx?.sendThinking ?? (async () => { void 0; }),
-    callLlm: ctx?.callLlm ?? (async () => "{}"),
+    projectId: 0,
+    runId: 0,
+    threadId: "",
+    sendMessage: async () => { void 0; },
+    sendThinking: async () => { void 0; },
+    callLlm: async () => {
+      console.warn("[agent:ctx] MOCK callLlm called — returning {}");
+      return "{}";
+    },
+    saveOutline: async () => { void 0; },
+    createCharacter: async () => ({ id: 0 }),
+    createShot: async () => ({ id: 0 }),
   };
 }
 
 export async function planOutlineNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
-  return outlineAgent.run(createNodeCtx(), state);
+  return outlineAgent.run(getNodeCtx(), state);
 }
 
 export async function planCharactersNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
-  return planAgent.runCharacters(createNodeCtx(), state);
+  return planAgent.runCharacters(getNodeCtx(), state);
 }
 
 export async function planShotsNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
-  return planAgent.runShots(createNodeCtx(), state);
+  return planAgent.runShots(getNodeCtx(), state);
 }
 
 export async function renderCharactersNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
-  return renderAgent.runCharacters(createNodeCtx(), state);
+  return renderAgent.runCharacters(getNodeCtx(), state);
 }
 
 export async function renderShotsNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
-  return renderAgent.runShots(createNodeCtx(), state);
+  return renderAgent.runShots(getNodeCtx(), state);
 }
 
 export async function composeVideosNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
-  return composeAgent.runVideos(createNodeCtx(), state);
+  return composeAgent.runVideos(getNodeCtx(), state);
 }
 
 export async function composeMergeNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
-  return composeAgent.runMerge(createNodeCtx(), state);
+  return composeAgent.runMerge(getNodeCtx(), state);
 }
 
 export async function addAudioNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
-  return composeAgent.runAddAudio(createNodeCtx(), state);
+  return composeAgent.runAddAudio(getNodeCtx(), state);
 }
 
 // Approval nodes - use interrupt() for human-in-the-loop
@@ -117,15 +141,15 @@ export function composeApprovalNode(state: Phase2StateType): Partial<Phase2State
 }
 
 export async function critiqueCharacterImagesNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
-  return criticAgent.reviewCharacters(createNodeCtx(), state);
+  return criticAgent.reviewCharacters(getNodeCtx(), state);
 }
 
 export async function critiqueShotImagesNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
-  return criticAgent.reviewShots(createNodeCtx(), state);
+  return criticAgent.reviewShots(getNodeCtx(), state);
 }
 
 export async function reviewNode(state: Phase2StateType): Promise<Partial<Phase2StateType>> {
-  return reviewEngine.run(createNodeCtx(), state);
+  return reviewEngine.run(getNodeCtx(), state);
 }
 
 // ── Routing functions ──

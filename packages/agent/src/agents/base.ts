@@ -4,9 +4,15 @@ export interface AgentContext {
   projectId: number;
   runId: number;
   threadId: string;
-  sendMessage: (content: string, opts?: { summary?: string; progress?: number; isLoading?: boolean }) => Promise<void>;
+  sendMessage: (content: string, opts?: { summary?: string; progress?: number; isLoading?: boolean; stage?: string }) => Promise<void>;
   sendThinking: (phase: "reasoning" | "decision" | "planning" | "reviewing", content: string, details?: string) => Promise<void>;
   callLlm: (systemPrompt: string, userPrompt: string, opts?: { maxTokens?: number }) => Promise<string>;
+  /** Persist the generated story outline and notify frontend via WS */
+  saveOutline: (outline: Record<string, unknown>, visualBible?: string | null) => Promise<void>;
+  /** Create a character record in the DB and notify frontend via WS */
+  createCharacter: (character: { name: string; description: string }) => Promise<{ id: number }>;
+  /** Create a shot record in the DB and notify frontend via WS */
+  createShot: (shot: { order: number; description: string; camera?: string; dialogue?: string; action?: string; scene?: string }) => Promise<{ id: number }>;
 }
 
 export class BaseAgent {
@@ -19,7 +25,7 @@ export class BaseAgent {
   async sendMessage(
     ctx: AgentContext,
     content: string,
-    opts?: { summary?: string; progress?: number; isLoading?: boolean },
+    opts?: { summary?: string; progress?: number; isLoading?: boolean; stage?: string },
   ): Promise<void> {
     await ctx.sendMessage(content, opts);
   }

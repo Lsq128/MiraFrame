@@ -5,16 +5,17 @@
   "type": "module",
   "main": "./src/index.ts",
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
+    "build": "tsup src/index.ts --format esm --dts --clean --tsconfig tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@openoii/shared": "workspace:*",
+    "@langchain/core": "^1.0.0",
     "@langchain/langgraph": "^1.0.0",
-    "@langchain/core": "^1.0.0"
+    "@openoii/shared": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "tsup": "^8.3.0",
     "typescript": "^5.5.4",
     "vitest": "^4.0.0"

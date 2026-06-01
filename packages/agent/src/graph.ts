@@ -29,8 +29,16 @@ export function buildPhase2Graph() {
     // Review node
     .addNode("review", nodes.reviewNode)
 
-    // Entry point
-    .addEdge(START, "plan_outline")
+    // Entry point — supports resuming from a requested stage.
+    .addConditionalEdges(START, nodes.routeFromStart, {
+      plan_outline: "plan_outline",
+      plan_characters: "plan_characters",
+      plan_shots: "plan_shots",
+      render_characters: "render_characters",
+      render_shots: "render_shots",
+      compose_videos: "compose_videos",
+      review: "review",
+    })
 
     // Production → Approval linear flow
     .addEdge("plan_outline", "outline_approval")

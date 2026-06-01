@@ -7,6 +7,7 @@ import { ServicesModule } from "./services";
 import { WsModule } from "./ws";
 import { AgentModule } from "./agent";
 import { GenerationModule } from "./modules/generation";
+import { ProjectsModule } from "./modules/projects/projects.module";
 import { BullModule } from "@nestjs/bullmq";
 
 @Module({
@@ -28,6 +29,7 @@ import { BullModule } from "@nestjs/bullmq";
     }),
     AgentModule,
     GenerationModule,
+    ProjectsModule,
   ],
 })
 export class AppModule {}

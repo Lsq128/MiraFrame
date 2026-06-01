@@ -16,16 +16,18 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server!: Server;
 
   handleConnection(client: Socket) {
-    console.log(`WS client connected: ${client.id}`);
+    console.log(`[WS] Client connected: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`WS client disconnected: ${client.id}`);
+    console.log(`[WS] Client disconnected: ${client.id}`);
   }
 
   @SubscribeMessage("join")
   handleJoinRoom(client: Socket, projectId: string) {
-    client.join(`project:${projectId}`);
+    const room = `project:${projectId}`;
+    client.join(room);
+    console.log(`[WS] Client ${client.id} joined room ${room}`);
     client.emit("connected", {
       type: "connected",
       data: { project_id: parseInt(projectId) },
@@ -33,6 +35,12 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   sendToProject(projectId: number, event: string, data: unknown) {
-    this.server.to(`project:${projectId}`).emit(event, data);
+    const room = `project:${projectId}`;
+    console.log(`[WS] → emit "${event}" to room ${room}`);
+    if (this.server) {
+      this.server.to(room).emit(event, data);
+    } else {
+      console.error(`[WS] Server not initialized! Cannot emit "${event}"`);
+    }
   }
 }

@@ -35,18 +35,18 @@ export const appConfig = registerAs("app", () => ({
   anthropicModel: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929",
 
   // ── 文本生成 ──
-  textProvider: process.env.TEXT_PROVIDER || "anthropic",
+  textProvider: process.env.TEXT_PROVIDER || "fake",
   textBaseUrl:
     process.env.TEXT_BASE_URL ||
-    "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    "https://dashscope.aliyuncs.com/compatible-mode/v1",
   textApiKey: process.env.TEXT_API_KEY || null,
   textModel: process.env.TEXT_MODEL || "deepseek-v4-flash",
-  textEndpoint: process.env.TEXT_ENDPOINT || "/",
+  textEndpoint: process.env.TEXT_ENDPOINT || "/chat/completions",
   textEnableThinking: process.env.TEXT_ENABLE_THINKING === "true",
   fakeTextResponse: process.env.FAKE_TEXT_RESPONSE || null,
 
   // ── 图像生成 ──
-  imageProvider: process.env.IMAGE_PROVIDER || "openai",
+  imageProvider: process.env.IMAGE_PROVIDER || "fake",
   imageBaseUrl: process.env.IMAGE_BASE_URL || "https://api.openai.com/v1",
   imageApiKey: process.env.IMAGE_API_KEY || null,
   imageModel: process.env.IMAGE_MODEL || "dall-e-3",
@@ -55,7 +55,7 @@ export const appConfig = registerAs("app", () => ({
   fakeImageFixtureUrl: process.env.FAKE_IMAGE_FIXTURE_URL || null,
 
   // ── 视频生成 ──
-  videoProvider: process.env.VIDEO_PROVIDER || "openai",
+  videoProvider: process.env.VIDEO_PROVIDER || "fake",
   videoBaseUrl: process.env.VIDEO_BASE_URL || "https://api.example.com/v1",
   videoApiKey: process.env.VIDEO_API_KEY || null,
   videoModel: process.env.VIDEO_MODEL || "video-gen-1",
