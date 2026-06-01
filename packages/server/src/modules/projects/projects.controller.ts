@@ -23,7 +23,7 @@ import { eq, desc, asc } from "drizzle-orm";
 export class ProjectsController {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
-    private readonly wsGateway: WsGateway,
+    @Inject(WsGateway) private readonly wsGateway: WsGateway,
   ) {}
 
   @Get()

@@ -5,24 +5,26 @@ import Redis from "ioredis";
 import { REDIS_CLIENT, REDIS_SUBSCRIBER } from "../redis";
 import { DRIZZLE, type Db } from "../db";
 import { WsGateway } from "../ws";
-import { TextService } from "../services";
-import { buildPhase2Graph, setNodeContext, clearNodeContext } from "@openoii/agent";
+import { ImageService, TextService, VideoService } from "../services";
+import { buildPhase2Graph, setNodeContext, clearNodeContext, runWithNodeContext } from "@openoii/agent";
 import type { Phase2StateType } from "@openoii/agent";
 import { MemorySaver, Command, INTERRUPT, isInterrupted } from "@langchain/langgraph";
-import { eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { schema } from "../db";
 import type { GenerationInput } from "./agent.service";
 
-@Processor("generation")
+@Processor("generation", { concurrency: 8 })
 @Injectable()
 export class AgentProcessor extends WorkerHost {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @Inject(REDIS_SUBSCRIBER) private readonly redisSub: Redis,
-    @Inject(DRIZZLE) private readonly db: Db,
-    @Inject(WsGateway) private readonly wsGateway: WsGateway,
-    @Inject(TextService) private readonly textService: TextService,
-  ) {
+	    @Inject(DRIZZLE) private readonly db: Db,
+	    @Inject(WsGateway) private readonly wsGateway: WsGateway,
+	    @Inject(TextService) private readonly textService: TextService,
+	    @Inject(ImageService) private readonly imageService: ImageService,
+	    @Inject(VideoService) private readonly videoService: VideoService,
+	  ) {
     super();
   }
 
@@ -30,6 +32,15 @@ export class AgentProcessor extends WorkerHost {
     const { projectId, runId, threadId } = job.data;
     console.log(`[processor] === Starting generation job ===`);
     console.log(`[processor] projectId=${projectId} runId=${runId} threadId=${threadId}`);
+
+    const [run] = await this.db
+      .select({ status: schema.agentRuns.status })
+      .from(schema.agentRuns)
+      .where(eq(schema.agentRuns.id, runId));
+    if (run && run.status !== "running" && run.status !== "queued") {
+      console.log(`[processor] Skipping run=${runId}; status=${run.status}`);
+      return;
+    }
 
     // Build the graph with checkpointer
     console.log(`[processor] Building graph...`);
@@ -45,6 +56,8 @@ export class AgentProcessor extends WorkerHost {
         story: schema.projects.story,
         style: schema.projects.style,
         targetShotCount: schema.projects.targetShotCount,
+        storyOutline: schema.projects.storyOutline,
+        visualBible: schema.projects.visualBible,
       })
       .from(schema.projects)
       .where(eq(schema.projects.id, projectId));
@@ -53,11 +66,15 @@ export class AgentProcessor extends WorkerHost {
       `Project title: ${project?.title || `Project ${projectId}`}`,
       `Visual style: ${project?.style || "anime"}`,
       `Target shot count: ${project?.targetShotCount || 4}`,
+      project?.visualBible ? `Visual bible:\n${project.visualBible}` : null,
+      project?.storyOutline ? `Approved outline JSON:\n${JSON.stringify(project.storyOutline)}` : null,
       "Story brief:",
       project?.story || "No story brief provided.",
-    ].join("\n");
-    let latestOutline: Record<string, unknown> | null = null;
-    let latestVisualBible: string | null = null;
+    ]
+      .filter(Boolean)
+      .join("\n");
+    let latestOutline: Record<string, unknown> | null = project?.storyOutline || null;
+    let latestVisualBible: string | null = project?.visualBible || null;
 
     // ---- Build the REAL agent context ----
     const ctx = {
@@ -163,6 +180,32 @@ export class AgentProcessor extends WorkerHost {
 
       createCharacter: async (char: { name: string; description: string }) => {
         console.log(`[processor:db] Creating character: "${char.name}"`);
+        const [existing] = await this.db
+          .select()
+          .from(schema.characters)
+          .where(and(eq(schema.characters.projectId, projectId), eq(schema.characters.name, char.name)))
+          .orderBy(asc(schema.characters.id))
+          .limit(1);
+
+        if (existing) {
+          const [updated] = await this.db
+            .update(schema.characters)
+            .set({
+              description: char.description || existing.description,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.characters.id, existing.id))
+            .returning();
+
+          if (updated) {
+            this.wsGateway.sendToProject(projectId, "character_updated", {
+              character: toCharacterPayload(updated),
+            });
+          }
+
+          return updated || existing;
+        }
+
         const [record] = await this.db
           .insert(schema.characters)
           .values({
@@ -192,28 +235,124 @@ export class AgentProcessor extends WorkerHost {
         return record || { id: 0 };
       },
 
+      generateCharacterImage: async () => {
+        console.log(`[processor] Generating character images for project ${projectId}`);
+        await ctx.sendMessage("正在生成角色人物照片...", {
+          summary: "角色照片生成中",
+          progress: 0.38,
+          stage: "plan_characters",
+        });
+
+        const characters = await this.db
+          .select()
+          .from(schema.characters)
+          .where(eq(schema.characters.projectId, projectId))
+          .orderBy(asc(schema.characters.id));
+
+        for (const character of characters) {
+          if (character.imageUrl) continue;
+          const prompt = [
+            `Create a polished character portrait for an AI comic/drama project.`,
+            `Project style: ${project?.style || "anime"}.`,
+            `Character name: ${character.name}.`,
+            `Character description: ${character.description || ""}`,
+            `Visual bible: ${latestVisualBible || "clean, consistent character design, expressive face, full body reference"}.`,
+          ].join("\n");
+
+          try {
+            const imageUrl = await this.imageService.generateImage(prompt);
+            const [updated] = await this.db
+              .update(schema.characters)
+              .set({
+                imageUrl,
+                referenceImages: [imageUrl],
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.characters.id, character.id))
+              .returning();
+
+            if (updated) {
+              this.wsGateway.sendToProject(projectId, "character_updated", {
+                character: toCharacterPayload(updated),
+              });
+            }
+          } catch (err) {
+            console.warn(`[processor] Character image generation failed for "${character.name}":`, err);
+            await ctx.sendMessage(`角色「${character.name}」照片生成暂时失败，可稍后重新生成。`, {
+              summary: "角色照片生成失败",
+              progress: 0.38,
+              stage: "plan_characters",
+            });
+          }
+        }
+      },
+
       createShot: async (shot: {
         order: number;
         description: string;
-        camera?: string;
-        dialogue?: string;
-        action?: string;
-        scene?: string;
-      }) => {
-        console.log(`[processor:db] Creating shot: order=${shot.order}`);
-        const [record] = await this.db
-          .insert(schema.shots)
-          .values({
-            projectId,
-            order: shot.order,
-            description: shot.description,
-            camera: shot.camera || null,
-            dialogue: shot.dialogue || null,
-            action: shot.action || null,
-            scene: shot.scene || null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
+	        camera?: string;
+	        dialogue?: string;
+	        action?: string;
+	        scene?: string;
+	        lighting?: string;
+	        prompt?: string;
+	        imagePrompt?: string;
+	        duration?: number;
+	        motionNote?: string;
+	      }) => {
+	        console.log(`[processor:db] Creating shot: order=${shot.order}`);
+	        const imagePrompt = shot.imagePrompt || buildShotImagePrompt(shot, latestVisualBible, project?.style);
+	        const videoPrompt = shot.prompt || buildShotVideoPrompt(shot, imagePrompt);
+	        const [existing] = await this.db
+	          .select()
+	          .from(schema.shots)
+	          .where(and(eq(schema.shots.projectId, projectId), eq(schema.shots.order, shot.order)))
+	          .limit(1);
+
+	        if (existing) {
+	          const [updated] = await this.db
+	            .update(schema.shots)
+	            .set({
+	              description: shot.description,
+	              prompt: videoPrompt,
+	              imagePrompt,
+	              camera: shot.camera || null,
+	              dialogue: shot.dialogue || null,
+	              action: shot.action || null,
+	              scene: shot.scene || null,
+	              lighting: shot.lighting || null,
+	              motionNote: shot.motionNote || null,
+	              duration: shot.duration || existing.duration || 5,
+	              updatedAt: new Date(),
+	            })
+	            .where(eq(schema.shots.id, existing.id))
+	            .returning();
+
+	          if (updated) {
+	            this.wsGateway.sendToProject(projectId, "shot_updated", { shot: toShotPayload(updated) });
+	          }
+
+	          return updated || existing;
+	        }
+
+	        const [record] = await this.db
+	          .insert(schema.shots)
+	          .values({
+	            projectId,
+	            order: shot.order,
+	            description: shot.description,
+	            prompt: videoPrompt,
+	            imagePrompt,
+	            camera: shot.camera || null,
+	            dialogue: shot.dialogue || null,
+	            action: shot.action || null,
+	            scene: shot.scene || null,
+	            lighting: shot.lighting || null,
+	            motionNote: shot.motionNote || null,
+	            duration: shot.duration || 5,
+	            createdAt: new Date(),
+	            updatedAt: new Date(),
+	          })
           .returning();
         if (record) {
           // Send full Shot record via WS
@@ -237,19 +376,115 @@ export class AgentProcessor extends WorkerHost {
             },
           });
         }
-        return record || { id: 0 };
-      },
-    };
+	        return record || { id: 0 };
+	      },
+
+	      generateShotFrames: async () => {
+	        console.log(`[processor] Generating shot frames for project ${projectId}`);
+	        const shots = await this.db
+	          .select()
+	          .from(schema.shots)
+	          .where(eq(schema.shots.projectId, projectId))
+	          .orderBy(asc(schema.shots.order));
+
+	        for (const shot of shots) {
+	          if (shot.imageUrl) continue;
+	          const imagePrompt = shot.imagePrompt || buildShotImagePrompt(shot, latestVisualBible, project?.style);
+	          const imageUrl = await this.imageService.generateImage(imagePrompt);
+	          const [updated] = await this.db
+	            .update(schema.shots)
+	            .set({
+	              imagePrompt,
+	              imageUrl,
+	              updatedAt: new Date(),
+	            })
+	            .where(eq(schema.shots.id, shot.id))
+	            .returning();
+
+	          if (updated) {
+	            this.wsGateway.sendToProject(projectId, "shot_updated", { shot: toShotPayload(updated) });
+	          }
+	        }
+	      },
+
+	      generateShotVideos: async () => {
+	        console.log(`[processor] Generating shot videos for project ${projectId}`);
+	        const shots = await this.db
+	          .select()
+	          .from(schema.shots)
+	          .where(eq(schema.shots.projectId, projectId))
+	          .orderBy(asc(schema.shots.order));
+
+	        for (const shot of shots) {
+	          if (shot.videoUrl) continue;
+	          const prompt = shot.prompt || buildShotVideoPrompt(shot, shot.imagePrompt || shot.description);
+	          const videoUrl = await this.videoService.generateVideo(prompt, {
+	            imageUrl: shot.imageUrl,
+	            duration: shot.duration,
+	          });
+	          const [updated] = await this.db
+	            .update(schema.shots)
+	            .set({
+	              prompt,
+	              videoUrl,
+	              updatedAt: new Date(),
+	            })
+	            .where(eq(schema.shots.id, shot.id))
+	            .returning();
+
+	          if (updated) {
+	            this.wsGateway.sendToProject(projectId, "shot_updated", { shot: toShotPayload(updated) });
+	          }
+	        }
+	      },
+
+	      composeProjectVideo: async () => {
+	        console.log(`[processor] Composing final output for project ${projectId}`);
+	        const shots = await this.db
+	          .select()
+	          .from(schema.shots)
+	          .where(eq(schema.shots.projectId, projectId))
+	          .orderBy(asc(schema.shots.order));
+	        const clipUrls = shots.map((shot) => shot.videoUrl).filter((url): url is string => Boolean(url));
+	        const videoUrl = clipUrls.length > 0 ? this.videoService.composeVideo(clipUrls) : null;
+
+	        await this.db
+	          .update(schema.projects)
+	          .set({
+	            videoUrl,
+	            status: videoUrl ? "completed" : "draft",
+	            updatedAt: new Date(),
+	          })
+	          .where(eq(schema.projects.id, projectId));
+
+	        this.wsGateway.sendToProject(projectId, "project_updated", {
+	          video_url: videoUrl,
+	          status: videoUrl ? "completed" : "draft",
+	        });
+	      },
+
+	    };
 
     // Inject context so graph nodes can use it
     setNodeContext(ctx);
 
     // Initial state
     const initialStage = (job.data.targetStage as Phase2StateType["currentStage"] | undefined) || "plan_outline";
-    const initialApprovalHistory: Record<string, string> =
-      initialStage === "plan_characters" || initialStage === "plan_shots"
-        ? { outline: "approved" }
-        : {};
+    const initialApprovalHistory: Record<string, string> = {};
+    if (
+      initialStage === "plan_characters" ||
+      initialStage === "plan_shots" ||
+      initialStage === "render_shot_images" ||
+      initialStage === "compose_videos"
+    ) {
+      initialApprovalHistory.outline = "approved";
+    }
+    if (initialStage === "plan_shots" || initialStage === "render_shot_images" || initialStage === "compose_videos") {
+      initialApprovalHistory.characters = "approved";
+    }
+    if (initialStage === "render_shot_images" || initialStage === "compose_videos") {
+      initialApprovalHistory.shots = "approved";
+    }
 
     const initialState: Phase2StateType = {
       projectId: String(projectId),
@@ -268,6 +503,7 @@ export class AgentProcessor extends WorkerHost {
     };
 
     try {
+      await runWithNodeContext(ctx, async () => {
       console.log(`[processor] Invoking graph with initial state...`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let graphInput: any = initialState;
@@ -390,6 +626,7 @@ export class AgentProcessor extends WorkerHost {
           throw error;
         }
       }
+      });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[processor] Generation FAILED for run ${runId}:`, errorMessage);
@@ -405,8 +642,31 @@ export class AgentProcessor extends WorkerHost {
       const channel = `generation:${projectId}:${runId}`;
       console.log(`[processor:confirm] Subscribing to Redis channel "${channel}"`);
 
+      const onMessage = (msgChannel: string, message: string) => {
+        if (msgChannel === channel) {
+          try {
+            const data = JSON.parse(message);
+            console.log(`[processor:confirm] Received message on "${channel}":`, data);
+            if (data.action === "confirm") {
+              clearTimeout(timer);
+              this.redisSub.off("message", onMessage);
+              this.redisSub.unsubscribe(channel);
+              resolve(true);
+            } else if (data.action === "cancel") {
+              clearTimeout(timer);
+              this.redisSub.off("message", onMessage);
+              this.redisSub.unsubscribe(channel);
+              resolve(false);
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+      };
+
       const timer = setTimeout(() => {
         console.log(`[processor:confirm] Timeout after ${timeoutMs}ms`);
+        this.redisSub.off("message", onMessage);
         this.redisSub.unsubscribe(channel);
         resolve(false);
       }, timeoutMs);
@@ -421,25 +681,96 @@ export class AgentProcessor extends WorkerHost {
         console.log(`[processor:confirm] Subscribed to "${channel}"`);
       });
 
-      this.redisSub.on("message", (msgChannel, message) => {
-        if (msgChannel === channel) {
-          try {
-            const data = JSON.parse(message);
-            console.log(`[processor:confirm] Received message on "${channel}":`, data);
-            if (data.action === "confirm") {
-              clearTimeout(timer);
-              this.redisSub.unsubscribe(channel);
-              resolve(true);
-            } else if (data.action === "cancel") {
-              clearTimeout(timer);
-              this.redisSub.unsubscribe(channel);
-              resolve(false);
-            }
-          } catch {
-            // ignore parse errors
-          }
-        }
-      });
+      this.redisSub.on("message", onMessage);
     });
   }
+}
+
+type CharacterRecord = typeof schema.characters.$inferSelect;
+type ShotRecord = typeof schema.shots.$inferSelect;
+
+function toCharacterPayload(record: CharacterRecord) {
+  return {
+    id: record.id,
+    project_id: record.projectId,
+    name: record.name,
+    description: record.description,
+    image_url: record.imageUrl,
+    reference_images: record.referenceImages,
+    visual_notes: record.visualNotes,
+    approval_state: "draft",
+    approval_version: record.approvalVersion || 0,
+  };
+}
+
+function toShotPayload(record: ShotRecord) {
+  return {
+    id: record.id,
+    project_id: record.projectId,
+    order: record.order,
+    description: record.description,
+    camera: record.camera,
+    scene: record.scene,
+    action: record.action,
+    dialogue: record.dialogue,
+    image_url: record.imageUrl,
+    video_url: record.videoUrl,
+    duration: record.duration,
+    prompt: record.prompt,
+    image_prompt: record.imagePrompt,
+    approval_state: "draft",
+    approval_version: record.approvalVersion || 0,
+  };
+}
+
+function buildShotImagePrompt(
+  shot: {
+    order?: number;
+    description?: string | null;
+    camera?: string | null;
+    scene?: string | null;
+    action?: string | null;
+    lighting?: string | null;
+  },
+  visualBible?: string | null,
+  style?: string | null,
+): string {
+  return [
+    `Create a storyboard key frame for shot ${shot.order || ""}.`,
+    `Style: ${style || "anime comic drama"}.`,
+    visualBible ? `Visual bible: ${visualBible}.` : null,
+    shot.scene ? `Scene: ${shot.scene}.` : null,
+    shot.description ? `Description: ${shot.description}.` : null,
+    shot.action ? `Action: ${shot.action}.` : null,
+    shot.camera ? `Camera: ${shot.camera}.` : null,
+    shot.lighting ? `Lighting: ${shot.lighting}.` : null,
+    "Single cinematic frame, consistent character designs, production-ready composition.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildShotVideoPrompt(
+  shot: {
+    order?: number;
+    description?: string | null;
+    camera?: string | null;
+    action?: string | null;
+    dialogue?: string | null;
+    motionNote?: string | null;
+  },
+  imagePrompt?: string | null,
+): string {
+  return [
+    `Generate a short comic-drama video clip for shot ${shot.order || ""}.`,
+    imagePrompt ? `Key frame prompt: ${imagePrompt}.` : null,
+    shot.description ? `Story action: ${shot.description}.` : null,
+    shot.action ? `Movement: ${shot.action}.` : null,
+    shot.motionNote ? `Motion note: ${shot.motionNote}.` : null,
+    shot.camera ? `Camera: ${shot.camera}.` : null,
+    shot.dialogue ? `Dialogue context: ${shot.dialogue}.` : null,
+    "Keep motion gentle, coherent, and suitable for later montage composition.",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

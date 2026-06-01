@@ -18,6 +18,10 @@ function mockCtx(overrides?: Partial<AgentContext>): AgentContext {
     saveOutline: async () => { void 0; },
     createCharacter: async () => ({ id: 1 }),
     createShot: async () => ({ id: 1 }),
+    generateCharacterImage: async () => { void 0; },
+    generateShotFrames: async () => { void 0; },
+    generateShotVideos: async () => { void 0; },
+    composeProjectVideo: async () => { void 0; },
     ...overrides,
   };
 }

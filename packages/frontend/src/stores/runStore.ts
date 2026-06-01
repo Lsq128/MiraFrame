@@ -65,7 +65,7 @@ interface RunState {
 
 export const useRunStore = create<RunState>((set) => ({
   isGenerating: false,
-  currentStage: "plan",
+  currentStage: "outline",
   currentAgent: null,
   progress: 0,
   currentRunId: null,

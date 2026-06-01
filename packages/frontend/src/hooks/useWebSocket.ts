@@ -7,6 +7,7 @@ import { useCharacterStore } from "@/stores/characterStore";
 import { useShotStore } from "@/stores/shotStore";
 import { useMessageStore } from "@/stores/messageStore";
 import { useProjectStore } from "@/stores/projectStore";
+import { resolveEventStage } from "@/utils/workflowStage";
 import type { AgentMessage, WorkflowStage } from "@/types";
 
 // ---- Module-level state (shared across hook instances) ----
@@ -23,30 +24,6 @@ function getWsBase(): string {
   return `http://${window.location.hostname}:3000`;
 }
 
-function resolveEventStage(data: Record<string, unknown>): WorkflowStage | null {
-  const stage = (data.stage as string) || (data.current_stage as string) || null;
-  if (!stage) return null;
-  const stageMap: Record<string, WorkflowStage> = {
-    plan_outline: "plan",
-    outline_approval: "plan_approval",
-    plan_characters: "plan",
-    characters_approval: "plan_approval",
-    plan_shots: "plan",
-    shots_approval: "plan_approval",
-    render_characters: "render",
-    critique_characters: "render",
-    character_images_approval: "render_approval",
-    render_shots: "render",
-    critique_shots: "render",
-    shot_images_approval: "render_approval",
-    compose_videos: "compose",
-    compose_approval: "compose",
-    compose_merge: "compose",
-    add_audio: "compose",
-    review: "review",
-  };
-  return stageMap[stage] || null;
-}
 
 const TRANSIENT_MESSAGE_PATTERNS = [
   /^正在生成视频\s+\d+\/\d+/,

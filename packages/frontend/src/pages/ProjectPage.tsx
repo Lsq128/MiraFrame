@@ -132,7 +132,7 @@ export default function ProjectPage() {
     onSuccess: (data: { run_id?: number; id?: number }) => {
       setGenerating(true);
       setCurrentRunId(data.run_id ?? data.id ?? null);
-      setCurrentStage("plan");
+      setCurrentStage("outline");
     },
   });
 
@@ -153,16 +153,25 @@ export default function ProjectPage() {
       if (data.run_id) {
         setCurrentRunId(data.run_id);
         setGenerating(true);
-        setCurrentStage("plan");
+        setCurrentStage("characters");
       }
       queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    },
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: ({ runId, feedback }: { runId: number; feedback?: string }) =>
+      projectsApi.resume(projectId!, runId, feedback),
+    onSuccess: () => {
+      setAwaitingConfirm(false);
+      setGenerating(true);
     },
   });
 
   // ---- Handlers ----
   const handleGenerate = useCallback(() => {
     clearMessages();
-    setCurrentStage("plan");
+    setCurrentStage("outline");
     generateMutation.mutate();
   }, [clearMessages, setCurrentStage, generateMutation]);
 
@@ -171,13 +180,13 @@ export default function ProjectPage() {
   const handleSendFeedback = useCallback((content: string) => feedbackMutation.mutate(content), [feedbackMutation]);
 
   const handleConfirm = useCallback((feedback?: string) => {
-    const isOutlineGate = awaitingAgent === "outline" || awaitingAgent === "plan" || !!projectQuery.data?.story_outline && !projectQuery.data?.outline_approved;
+    const isOutlineGate = awaitingAgent === "outline" || !!projectQuery.data?.story_outline && !projectQuery.data?.outline_approved;
     if (projectId && isOutlineGate) {
       approveOutlineMutation.mutate(feedback);
       return;
     }
-    if (currentRunId) send({ type: "confirm", data: { run_id: currentRunId, feedback } });
-  }, [approveOutlineMutation, awaitingAgent, currentRunId, projectId, projectQuery.data?.outline_approved, projectQuery.data?.story_outline, send]);
+    if (currentRunId) resumeMutation.mutate({ runId: currentRunId, feedback });
+  }, [approveOutlineMutation, awaitingAgent, currentRunId, projectId, projectQuery.data?.outline_approved, projectQuery.data?.story_outline, resumeMutation]);
 
   const handleContinuePlanning = useCallback(async () => {
     if (!projectId) return;
@@ -185,7 +194,7 @@ export default function ProjectPage() {
     const queuedRun = result as typeof result & { run_id?: number };
     setGenerating(true);
     setCurrentRunId(queuedRun.run_id ?? result.id ?? null);
-    setCurrentStage("plan");
+    setCurrentStage("outline");
     openChatPanel();
   }, [openChatPanel, projectId, setCurrentRunId, setCurrentStage, setGenerating]);
 
@@ -194,7 +203,7 @@ export default function ProjectPage() {
     if (searchParams.get("autoStart") === "true" && projectQuery.data && !autoStartTriggered.current && !isGenerating) {
       autoStartTriggered.current = true;
       clearMessages();
-      setCurrentStage("plan");
+      setCurrentStage("outline");
       generateMutation.mutate();
       openChatPanel();
       searchParams.delete("autoStart");
@@ -281,7 +290,7 @@ function CanvasArea({
   const hasCharacterImages = characters.some((c) => !!c.image_url);
   const hasShotImages = shots.some((s) => !!s.image_url);
   const hasShotVideos = shots.some((s) => !!s.video_url);
-  const awaitingOutline = awaitingConfirm && (awaitingAgent === "outline" || awaitingAgent === "plan");
+  const awaitingOutline = awaitingConfirm && (awaitingAgent === "outline");
   const needsOutlineApproval = hasOutline && !outlineApproved;
   const canContinuePlanning = hasOutline && outlineApproved && characters.length === 0 && !isGenerating;
 
@@ -291,51 +300,44 @@ function CanvasArea({
       label: "故事大纲",
       description: hasOutline ? getOutlineLogline(outlineRecord) || "已生成剧情结构" : "从剧本提炼叙事骨架",
       icon: FileText,
-      status: hasOutline ? (awaitingOutline || needsOutlineApproval ? "review" : "done") : currentStage === "plan" && isGenerating ? "active" : "pending",
+      status: hasOutline ? (awaitingOutline || needsOutlineApproval ? "review" : "done") : currentStage === "outline" && isGenerating ? "active" : "pending",
       metric: hasOutline ? `${getOutlineActs(outlineRecord).length || 1} 段` : "待生成",
     },
     {
       id: "characters",
       label: "角色设定",
-      description: characters.length > 0 ? characters.slice(0, 3).map((c) => c.name).join("、") : "抽取人物与视觉设定",
+      description: characters.length > 0
+        ? characters.slice(0, 3).map((c) => c.name).join("、") + (characters.some((c) => !!c.image_url) ? "（含角色图）" : "")
+        : "抽取人物并生成角色形象",
       icon: Users,
-      status: characters.length > 0 ? "done" : hasOutline && !awaitingConfirm && isGenerating ? "active" : "pending",
+      status: characters.length > 0 ? "done" : hasOutline && outlineApproved && isGenerating && (currentStage === "characters" || currentStage === "characters_approval") ? "active" : "pending",
       metric: `${characters.length} 个`,
     },
     {
       id: "shots",
       label: "分镜脚本",
-      description: shots.length > 0 ? "镜头、动作、对白与画面提示词" : "拆解可生成镜头",
+      description: shots.length > 0 ? `${shots.length} 个镜头，动作、对白与提示词` : "拆解可生成镜头",
       icon: Film,
-      status: shots.length > 0 ? "done" : characters.length > 0 && isGenerating ? "active" : "pending",
+      status: shots.length > 0 ? "done" : characters.length > 0 && isGenerating && (currentStage === "shots" || currentStage === "shots_approval") ? "active" : "pending",
       metric: `${shots.length} 镜`,
-    },
-    {
-      id: "characterImages",
-      label: "角色图像",
-      description: hasCharacterImages ? "角色参考图已回填" : "为主角生成稳定参考",
-      icon: Image,
-      status: hasCharacterImages ? "done" : currentStage === "render" && isGenerating ? "active" : "pending",
-      metric: `${characters.filter((c) => !!c.image_url).length}/${characters.length || 0}`,
     },
     {
       id: "shotImages",
       label: "镜头画面",
-      description: hasShotImages ? "镜头图已生成" : "逐镜头生成画面",
-      icon: Sparkles,
-      status: hasShotImages ? "done" : currentStage === "render" && shots.length > 0 ? "active" : "pending",
-      metric: `${shots.filter((s) => !!s.image_url).length}/${shots.length || 0}`,
+      description: hasShotVideos ? "镜头视频片段已生成" : hasShotImages ? "分镜帧已生成" : "由分镜生成镜头视频",
+      icon: Image,
+      status: hasShotVideos ? "done" : currentStage === "shot_images" && isGenerating ? "active" : "pending",
+      metric: `${shots.filter((s) => !!s.video_url).length}/${shots.length || 0}`,
     },
     {
       id: "output",
       label: "合成输出",
       description: projectVideoUrl || hasShotVideos ? "视频片段准备输出" : "合成最终漫剧视频",
       icon: Download,
-      status: projectVideoUrl ? "done" : currentStage === "compose" && isGenerating ? "active" : "pending",
+      status: projectVideoUrl ? "done" : currentStage === "output" && isGenerating ? "active" : "pending",
       metric: projectVideoUrl ? "已输出" : `${shots.filter((s) => !!s.video_url).length} 段`,
     },
-  ];
-  const selectedNode = nodes.find((node) => node.id === selectedNodeId) || nodes[0];
+  ];  const selectedNode = nodes.find((node) => node.id === selectedNodeId) || nodes[0];
 
   return (
     <div className="flex-1 overflow-hidden bg-[#f7f8fb]">
@@ -391,6 +393,7 @@ function CanvasArea({
                   shots={sortedShots}
                   projectVideoUrl={projectVideoUrl}
                   awaitingConfirm={awaitingConfirm}
+                  awaitingAgent={awaitingAgent}
                   awaitingOutline={awaitingOutline}
                   needsOutlineApproval={needsOutlineApproval}
                   canContinuePlanning={canContinuePlanning}
@@ -507,7 +510,6 @@ function WorkflowConnectors() {
       <path d="M600 132 C675 132, 675 100, 750 100" stroke="#cbd5e1" strokeWidth="2" fill="none" markerEnd="url(#workflow-arrow)" />
       <path d="M750 235 C675 290, 335 290, 260 347" stroke="#cbd5e1" strokeWidth="2" fill="none" markerEnd="url(#workflow-arrow)" />
       <path d="M260 347 C335 347, 335 379, 410 379" stroke="#cbd5e1" strokeWidth="2" fill="none" markerEnd="url(#workflow-arrow)" />
-      <path d="M600 379 C675 379, 675 347, 750 347" stroke="#cbd5e1" strokeWidth="2" fill="none" markerEnd="url(#workflow-arrow)" />
     </svg>
   );
 }
@@ -537,6 +539,7 @@ function NodeDetail({
   shots,
   projectVideoUrl,
   awaitingConfirm,
+  awaitingAgent,
   awaitingOutline,
   needsOutlineApproval,
   canContinuePlanning,
@@ -550,6 +553,7 @@ function NodeDetail({
   shots: Shot[];
   projectVideoUrl: string | null;
   awaitingConfirm: boolean;
+  awaitingAgent: string | null;
   awaitingOutline: boolean;
   needsOutlineApproval: boolean;
   canContinuePlanning: boolean;
@@ -569,15 +573,16 @@ function NodeDetail({
             确认大纲
           </button>
         )}
-        {canContinuePlanning && (selectedNode.id === "outline" || selectedNode.id === "characters") && (
-          <button onClick={onContinuePlanning} className="btn btn-primary btn-sm gap-1 shrink-0">
-            <Play className="h-4 w-4" />
-            生成角色和分镜
+        {selectedNode.id === "characters" && awaitingConfirm && awaitingAgent === "characters" && (
+          <button onClick={() => onConfirm()} className="btn btn-primary btn-sm gap-1 shrink-0">
+            <CheckCircle2 className="h-4 w-4" />
+            确认角色
           </button>
         )}
-        {awaitingConfirm && selectedNode.id !== "outline" && (
-          <button onClick={() => onConfirm()} className="btn btn-primary btn-sm shrink-0">
-            通过当前节点
+        {selectedNode.id === "shots" && awaitingConfirm && awaitingAgent === "shots" && (
+          <button onClick={() => onConfirm()} className="btn btn-primary btn-sm gap-1 shrink-0">
+            <CheckCircle2 className="h-4 w-4" />
+            确认分镜
           </button>
         )}
       </div>
@@ -590,6 +595,7 @@ function NodeDetail({
         <div className="grid grid-cols-3 gap-2">
           {characters.length === 0 ? <EmptyNodeContent text="角色设定尚未生成" /> : characters.slice(0, 6).map((c) => (
             <div key={c.id} className="rounded-md border border-base-200 p-2">
+              {c.image_url && <img src={c.image_url} alt={c.name} className="h-20 w-full object-cover rounded mb-1" />}
               <p className="text-sm font-medium truncate">{c.name}</p>
               <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{c.description}</p>
             </div>
@@ -608,12 +614,10 @@ function NodeDetail({
         </div>
       )}
 
-      {selectedNode.id === "characterImages" && (
-        <AssetStrip emptyText="角色图像尚未生成" items={characters.map((c) => ({ id: c.id, title: c.name, url: c.image_url || null }))} />
-      )}
+
 
       {selectedNode.id === "shotImages" && (
-        <AssetStrip emptyText="镜头画面尚未生成" items={shots.map((s) => ({ id: s.id, title: `镜头 ${s.order}`, url: s.image_url || null }))} />
+        <AssetStrip emptyText="镜头视频尚未生成" items={shots.map((s) => ({ id: s.id, title: `镜头 ${s.order}`, url: s.video_url || s.image_url || null }))} />
       )}
 
       {selectedNode.id === "output" && (
@@ -645,14 +649,22 @@ function AssetStrip({
 
   return (
     <div className="grid grid-cols-4 gap-2">
-      {visible.slice(0, 8).map((item) => (
-        <div key={item.id} className="rounded-md border border-base-200 overflow-hidden bg-base-100">
-          <img src={item.url!} alt={item.title} className="h-20 w-full object-cover" />
-          <p className="text-xs px-2 py-1 truncate">{item.title}</p>
-        </div>
-      ))}
+	      {visible.slice(0, 8).map((item) => (
+	        <div key={item.id} className="rounded-md border border-base-200 overflow-hidden bg-base-100">
+	          {isVideoUrl(item.url!) ? (
+	            <video src={item.url!} className="h-20 w-full object-cover" controls />
+	          ) : (
+	            <img src={item.url!} alt={item.title} className="h-20 w-full object-cover" />
+	          )}
+	          <p className="text-xs px-2 py-1 truncate">{item.title}</p>
+	        </div>
+	      ))}
     </div>
   );
+}
+
+function isVideoUrl(url: string): boolean {
+  return /\.(mp4|webm|mov)(\?|#|$)/i.test(url) || url.includes("/video");
 }
 
 function OutlineCanvasPreview({

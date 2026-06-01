@@ -8,16 +8,14 @@ export { BaseAgent } from "./agents/base.js";
 export type { AgentContext } from "./agents/base.js";
 export { OutlineAgent } from "./agents/outline.js";
 export { PlanAgent } from "./agents/plan.js";
-export { RenderAgent } from "./agents/render.js";
 export { ComposeAgent } from "./agents/compose.js";
-export { CriticAgent } from "./agents/critic.js";
 export { ReviewRuleEngine } from "./agents/review.js";
 
 // Nodes (for testing)
 export * as nodes from "./nodes/index.js";
 
 // Context injection (called by Nest.js processor before graph execution)
-export { setNodeContext, clearNodeContext } from "./nodes/index.js";
+export { setNodeContext, clearNodeContext, runWithNodeContext } from "./nodes/index.js";
 
 // Prompts
 export * from "./prompts/index.js";

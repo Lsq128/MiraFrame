@@ -6,22 +6,15 @@ export function resolveEventStage(data: Record<string, unknown>): WorkflowStage 
   if (!stage) return null;
 
   const stageMap: Record<string, WorkflowStage> = {
-    plan_outline: "plan",
-    outline_approval: "plan_approval",
-    plan_characters: "plan",
-    characters_approval: "plan_approval",
-    plan_shots: "plan",
-    shots_approval: "plan_approval",
-    render_characters: "render",
-    critique_characters: "render",
-    character_images_approval: "render_approval",
-    render_shots: "render",
-    critique_shots: "render",
-    shot_images_approval: "render_approval",
-    compose_videos: "compose",
-    compose_approval: "compose",
-    compose_merge: "compose",
-    add_audio: "compose",
+    plan_outline: "outline",
+    outline_approval: "outline_approval",
+    plan_characters: "characters",
+    characters_approval: "characters_approval",
+    plan_shots: "shots",
+    shots_approval: "shots_approval",
+    render_shot_images: "shot_images",
+    compose_videos: "output",
+    compose_approval: "output",
     review: "review",
   };
 
@@ -37,35 +30,53 @@ export interface StageInfo {
 
 export function getWorkflowStageInfo(stage: WorkflowStage): StageInfo {
   const stages: Record<WorkflowStage, StageInfo> = {
-    plan: {
-      key: "plan",
-      label: "规划",
+    outline: {
+      key: "outline",
+      label: "大纲",
       icon: "bulb",
-      description: "正在分析故事并规划角色与分镜",
+      description: "正在分析故事并生成剧情大纲",
     },
-    plan_approval: {
-      key: "plan_approval",
-      label: "规划确认",
+    outline_approval: {
+      key: "outline_approval",
+      label: "大纲确认",
       icon: "user",
-      description: "请审核角色设计和分镜脚本",
+      description: "请审核故事大纲内容",
     },
-    render: {
-      key: "render",
-      label: "渲染",
-      icon: "palette",
-      description: "正在生成角色图像和分镜画面",
+    characters: {
+      key: "characters",
+      label: "角色设定",
+      icon: "users",
+      description: "正在分析角色并生成设定图",
     },
-    render_approval: {
-      key: "render_approval",
-      label: "渲染确认",
+    characters_approval: {
+      key: "characters_approval",
+      label: "角色确认",
       icon: "user",
-      description: "请审核生成的图像",
+      description: "请审核角色设计与形象",
     },
-    compose: {
-      key: "compose",
-      label: "合成",
+    shots: {
+      key: "shots",
+      label: "分镜",
       icon: "film",
-      description: "正在生成视频并合成最终成片",
+      description: "正在生成分镜脚本",
+    },
+    shots_approval: {
+      key: "shots_approval",
+      label: "分镜确认",
+      icon: "user",
+      description: "请审核分镜脚本内容",
+    },
+    shot_images: {
+      key: "shot_images",
+      label: "镜头画面",
+      icon: "image",
+      description: "正在生成分镜画面（预览）",
+    },
+    output: {
+      key: "output",
+      label: "合成输出",
+      icon: "download",
+      description: "正在合成最终漫剧视频",
     },
     review: {
       key: "review",
@@ -83,11 +94,14 @@ export const STAGE_PIPELINE: Array<{
   icon: string;
   label: string;
 }> = [
-  { key: "plan", icon: "bulb", label: "规划" },
-  { key: "plan_approval", icon: "user", label: "确认" },
-  { key: "render", icon: "palette", label: "渲染" },
-  { key: "render_approval", icon: "user", label: "确认" },
-  { key: "compose", icon: "film", label: "合成" },
+  { key: "outline", icon: "bulb", label: "大纲" },
+  { key: "outline_approval", icon: "user", label: "确认" },
+  { key: "characters", icon: "users", label: "角色设定" },
+  { key: "characters_approval", icon: "user", label: "确认" },
+  { key: "shots", icon: "film", label: "分镜" },
+  { key: "shots_approval", icon: "user", label: "确认" },
+  { key: "shot_images", icon: "image", label: "镜头画面" },
+  { key: "output", icon: "download", label: "合成" },
   { key: "review", icon: "user", label: "审查" },
 ];
 

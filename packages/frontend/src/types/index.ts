@@ -8,11 +8,14 @@ import type React from "react";
 export type ReviewState = "draft" | "approved" | "superseded";
 export type VersionEntityType = "character" | "shot";
 export type WorkflowStage =
-  | "plan"
-  | "plan_approval"
-  | "render"
-  | "render_approval"
-  | "compose"
+  | "outline"
+  | "outline_approval"
+  | "characters"
+  | "characters_approval"
+  | "shots"
+  | "shots_approval"
+  | "shot_images"
+  | "output"
   | "review";
 export type ConfigValue = string | number | boolean | null;
 

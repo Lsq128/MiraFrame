@@ -11,7 +11,7 @@ export class OutlineAgent extends BaseAgent {
     await this.sendMessage(ctx, "开始生成故事大纲...", { progress: 0.05, isLoading: true, stage: "plan_outline" });
     await this.sendThinking(ctx, "planning", "分析故事要素：主题、世界观、情感弧线...");
 
-    const outline = await this.callLlm(ctx, OUTLINE_SYSTEM_PROMPT, "Generate a story outline for this project.", { maxTokens: 4096 });
+    const outline = await this.callLlm(ctx, OUTLINE_SYSTEM_PROMPT, "请根据提供的故事创想生成一份详细的故事大纲。必须全部使用中文输出。", { maxTokens: 4096 });
 
     // Parse outline from LLM response
     let storyOutline: Record<string, unknown> = {};

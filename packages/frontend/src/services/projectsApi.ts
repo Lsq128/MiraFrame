@@ -63,11 +63,11 @@ export const projectsApi = {
     return res.json() as Promise<{ url: string; reference_images: string[] }>;
   },
 
-  getCharacters: (id: number) =>
-    fetchApi<Character[]>(`/api/v1/projects/${id}/characters`),
+  getCharacters: async (id: number) =>
+    (await fetchApi<Array<Character | ServerCharacter>>(`/api/v1/projects/${id}/characters`)).map(normalizeCharacter),
 
-  getShots: (id: number) =>
-    fetchApi<Shot[]>(`/api/v1/projects/${id}/shots`),
+  getShots: async (id: number) =>
+    (await fetchApi<Array<Shot | ServerShot>>(`/api/v1/projects/${id}/shots`)).map(normalizeShot),
 
   getOutline: (id: number) =>
     fetchApi<StoryOutline | null>(`/api/v1/projects/${id}/outline`),
@@ -159,6 +159,24 @@ type ServerMessage = Message & {
   createdAt?: Message["created_at"];
 };
 
+type ServerCharacter = Character & {
+  projectId?: Character["project_id"];
+  imageUrl?: Character["image_url"];
+  referenceImages?: Character["reference_images"];
+  visualNotes?: Character["visual_notes"];
+  approvedName?: Character["approved_name"];
+  approvedDescription?: Character["approved_description"];
+  approvedImageUrl?: Character["approved_image_url"];
+};
+
+type ServerShot = Shot & {
+  projectId?: Shot["project_id"];
+  imageUrl?: Shot["image_url"];
+  videoUrl?: Shot["video_url"];
+  imagePrompt?: Shot["image_prompt"];
+  motionNote?: Shot["motion_note"];
+};
+
 function normalizeProject(project: Project | ServerProject): Project {
   const p = project as ServerProject;
   return {
@@ -187,5 +205,31 @@ function normalizeMessage(message: Message | ServerMessage): Message {
     run_id: m.run_id ?? m.runId ?? null,
     is_loading: m.is_loading ?? m.isLoading ?? false,
     created_at: m.created_at ?? m.createdAt ?? "",
+  };
+}
+
+function normalizeCharacter(character: Character | ServerCharacter): Character {
+  const c = character as ServerCharacter;
+  return {
+    ...c,
+    project_id: c.project_id ?? c.projectId ?? 0,
+    image_url: c.image_url ?? c.imageUrl ?? null,
+    reference_images: c.reference_images ?? c.referenceImages ?? null,
+    visual_notes: c.visual_notes ?? c.visualNotes ?? null,
+    approved_name: c.approved_name ?? c.approvedName ?? null,
+    approved_description: c.approved_description ?? c.approvedDescription ?? null,
+    approved_image_url: c.approved_image_url ?? c.approvedImageUrl ?? null,
+  };
+}
+
+function normalizeShot(shot: Shot | ServerShot): Shot {
+  const s = shot as ServerShot;
+  return {
+    ...s,
+    project_id: s.project_id ?? s.projectId ?? 0,
+    image_url: s.image_url ?? s.imageUrl ?? null,
+    video_url: s.video_url ?? s.videoUrl ?? null,
+    image_prompt: s.image_prompt ?? s.imagePrompt ?? undefined,
+    motion_note: s.motion_note ?? s.motionNote ?? undefined,
   };
 }

@@ -12,7 +12,7 @@ export class GenerationController {
     @Inject(AgentService) private readonly agentService: AgentService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @Inject(DRIZZLE) private readonly db: Db,
-    private readonly wsGateway: WsGateway,
+    @Inject(WsGateway) private readonly wsGateway: WsGateway,
   ) {}
 
   @Post("generate")
@@ -90,6 +90,45 @@ export class GenerationController {
     @Body() body: { feedback?: string },
   ) {
     const projectId = parseInt(projectIdParam);
+
+    // If feedback is provided, regenerate outline instead of approving
+    if (body.feedback && body.feedback.trim().length > 0) {
+      const [project] = await this.db
+        .select({ story: schema.projects.story })
+        .from(schema.projects)
+        .where(eq(schema.projects.id, projectId));
+
+      // Append feedback to the story context for regeneration
+      const enhancedStory = (project?.story || "") + "\n\n[用户反馈]\n" + body.feedback;
+
+      // Ensure outline_approved is false before regenerating
+      await this.db
+        .update(schema.projects)
+        .set({ outlineApproved: false, updatedAt: new Date() })
+        .where(eq(schema.projects.id, projectId));
+
+      // Start a new generation run from plan_outline to regenerate the outline
+      const runId = await this.agentService.startGeneration({
+        projectId,
+        mode: "full",
+        autoMode: false,
+        targetStage: "plan_outline",
+      });
+
+      this.wsGateway.sendToProject(projectId, "outline_updated", {
+        project_id: projectId,
+        story_outline: null,
+        visual_bible: null,
+        outline_approved: false,
+      });
+
+      return {
+        status: "regenerating",
+        action: "regenerate",
+        run_id: runId,
+        feedback: body.feedback,
+      };
+    }
     try {
       const [project] = await this.db
         .update(schema.projects)
@@ -110,45 +149,6 @@ export class GenerationController {
       this.wsGateway.sendToProject(projectId, "project_updated", {
         outline_approved: true,
       });
-
-      const recentRuns = await this.db
-        .select({
-          id: schema.agentRuns.id,
-          status: schema.agentRuns.status,
-          updatedAt: schema.agentRuns.updatedAt,
-        })
-        .from(schema.agentRuns)
-        .where(eq(schema.agentRuns.projectId, projectId))
-        .orderBy(desc(schema.agentRuns.createdAt))
-        .limit(5);
-      const resumableRun = recentRuns.find((run) => run.status === "running" || run.status === "queued");
-      const isFreshRun = resumableRun
-        ? Date.now() - new Date(resumableRun.updatedAt).getTime() < 30 * 60 * 1000
-        : false;
-
-      if (resumableRun && isFreshRun) {
-        await this.redis.publish(
-          `generation:${projectId}:${resumableRun.id}`,
-          JSON.stringify({ action: "confirm", feedback: body.feedback }),
-        );
-        this.wsGateway.sendToProject(projectId, "run_confirmed", {
-          run_id: resumableRun.id,
-          project_id: projectId,
-        });
-        return {
-          status: "approved",
-          action: "resumed",
-          run_id: resumableRun.id,
-          resumed: true,
-        };
-      }
-
-      if (resumableRun) {
-        await this.db
-          .update(schema.agentRuns)
-          .set({ status: "cancelled", updatedAt: new Date(), error: "Stale approval wait replaced by a new run" })
-          .where(eq(schema.agentRuns.id, resumableRun.id));
-      }
 
       const runId = await this.agentService.startGeneration({
         projectId,

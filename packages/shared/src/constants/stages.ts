@@ -8,13 +8,12 @@ export const PHASE2_STAGES = [
   "render_characters",
   "critique_character_images",
   "character_images_approval",
+  "render_shot_images",
   "render_shots",
   "critique_shot_images",
   "shot_images_approval",
   "compose_videos",
   "compose_approval",
-  "compose_merge",
-  "add_audio",
   "review",
 ] as const;
 
@@ -30,14 +29,13 @@ export const STAGE_ORDER: Record<Phase2Stage, number> = {
   render_characters: 6,
   critique_character_images: 7,
   character_images_approval: 8,
-  render_shots: 9,
-  critique_shot_images: 10,
-  shot_images_approval: 11,
-  compose_videos: 12,
-  compose_approval: 13,
-  compose_merge: 14,
-  add_audio: 15,
-  review: 16,
+  render_shot_images: 9,
+  render_shots: 10,
+  critique_shot_images: 11,
+  shot_images_approval: 12,
+  compose_videos: 13,
+  compose_approval: 14,
+  review: 15,
 };
 
 export function nextStage(current: Phase2Stage): Phase2Stage | null {

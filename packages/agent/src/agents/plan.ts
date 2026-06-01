@@ -72,6 +72,10 @@ export class PlanAgent extends BaseAgent {
       action?: string;
       dialogue?: string;
       lighting?: string;
+      prompt?: string;
+      imagePrompt?: string;
+      duration?: number;
+      motionNote?: string;
     }> = [];
     try {
       const parsed = JSON.parse(extractJson(response));
@@ -97,6 +101,11 @@ export class PlanAgent extends BaseAgent {
           scene: shot.scene,
           action: shot.action,
           dialogue: shot.dialogue,
+          lighting: shot.lighting,
+          prompt: shot.prompt,
+          imagePrompt: shot.imagePrompt,
+          duration: shot.duration,
+          motionNote: shot.motionNote,
         });
         created.push(`#${record.id}`);
       } catch (err) {
@@ -163,23 +172,36 @@ function normalizeShot(value: unknown): {
   action?: string;
   dialogue?: string;
   lighting?: string;
+  prompt?: string;
+  imagePrompt?: string;
+  duration?: number;
+  motionNote?: string;
 } | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const description = String(record.description || record.shot_description || record.summary || "").trim();
   if (!description) return null;
 
-  return {
-    order: Number(record.order || record.shot || record.shot_number || 0),
-    description,
-    camera: stringOrUndefined(record.camera || record.camera_angle || record.shot_type),
-    scene: stringOrUndefined(record.scene || record.setting),
-    action: stringOrUndefined(record.action || record.motion),
-    dialogue: stringOrUndefined(record.dialogue || record.line),
-    lighting: stringOrUndefined(record.lighting),
-  };
-}
+	  return {
+	    order: Number(record.order || record.shot || record.shot_number || 0),
+	    description,
+	    camera: stringOrUndefined(record.camera || record.camera_angle || record.shot_type),
+	    scene: stringOrUndefined(record.scene || record.setting),
+	    action: stringOrUndefined(record.action || record.motion),
+	    dialogue: stringOrUndefined(record.dialogue || record.line),
+	    lighting: stringOrUndefined(record.lighting),
+	    prompt: stringOrUndefined(record.prompt || record.video_prompt),
+	    imagePrompt: stringOrUndefined(record.image_prompt || record.frame_prompt || record.visual_prompt),
+	    duration: numberOrUndefined(record.duration || record.duration_seconds),
+	    motionNote: stringOrUndefined(record.motion_note || record.motion || record.camera_motion),
+	  };
+	}
 
 function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function numberOrUndefined(value: unknown): number | undefined {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : undefined;
 }

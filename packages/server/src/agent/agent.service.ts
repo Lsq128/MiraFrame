@@ -1,11 +1,11 @@
-import { Injectable, Inject } from "@nestjs/common";
+import { Injectable, Inject, OnApplicationBootstrap } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
 import Redis from "ioredis";
 import { REDIS_CLIENT, REDIS_SUBSCRIBER } from "../redis";
 import { DRIZZLE, type Db } from "../db";
 import { WsGateway } from "../ws";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, lt } from "drizzle-orm";
 import { schema } from "../db";
 
 export interface GenerationInput {
@@ -18,7 +18,7 @@ export interface GenerationInput {
 }
 
 @Injectable()
-export class AgentService {
+export class AgentService implements OnApplicationBootstrap {
   constructor(
     @InjectQueue("generation") private readonly generationQueue: Queue,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
@@ -27,7 +27,59 @@ export class AgentService {
     @Inject(WsGateway) private readonly wsGateway: WsGateway,
   ) {}
 
+  async onApplicationBootstrap(): Promise<void> {
+    await this.cancelStaleRuns();
+  }
+
+  private async cancelStaleRuns(): Promise<void> {
+    const staleBefore = new Date(Date.now() - 30 * 60 * 1000);
+    const staleRuns = await this.db
+      .select({
+        id: schema.agentRuns.id,
+        projectId: schema.agentRuns.projectId,
+        threadId: schema.agentRuns.threadId,
+      })
+      .from(schema.agentRuns)
+      .where(
+        and(
+          inArray(schema.agentRuns.status, ["queued", "running"]),
+          lt(schema.agentRuns.updatedAt, staleBefore),
+        ),
+      );
+
+    if (!staleRuns.length) return;
+
+    const staleRunIds = new Set(staleRuns.map((run) => run.id));
+    console.warn(`[agent] Cancelling ${staleRuns.length} stale generation run(s) before ${staleBefore.toISOString()}`);
+
+    for (const run of staleRuns) {
+      await this.redis.publish(`generation:${run.projectId}:${run.id}`, JSON.stringify({ action: "cancel" }));
+    }
+
+    const jobs = await this.generationQueue.getJobs(["waiting", "active", "delayed"]);
+    for (const job of jobs) {
+      if (staleRunIds.has(job.data.runId)) {
+        try {
+          await job.remove();
+        } catch (err) {
+          console.warn(`[agent] Could not remove stale job ${job.id}:`, err);
+        }
+      }
+    }
+
+    await this.db
+      .update(schema.agentRuns)
+      .set({
+        status: "cancelled",
+        error: "Stale generation run cancelled on server startup",
+        updatedAt: new Date(),
+      })
+      .where(inArray(schema.agentRuns.id, Array.from(staleRunIds)));
+  }
+
   async startGeneration(input: Omit<GenerationInput, "runId" | "threadId">): Promise<number> {
+    await this.cancelActiveRunsForProject(input.projectId);
+
     // INSERT — let DB auto-generate the serial id
     const [row] = await this.db
       .insert(schema.agentRuns)
@@ -85,7 +137,11 @@ export class AgentService {
     const jobs = await this.generationQueue.getJobs(["waiting", "active", "delayed"]);
     for (const job of jobs) {
       if (job.data.projectId === projectId && job.data.runId === runId) {
-        await job.remove();
+        try {
+          await job.remove();
+        } catch (err) {
+          console.warn(`[agent] Could not remove job ${job.id} for run=${runId}:`, err);
+        }
       }
     }
 
@@ -102,6 +158,22 @@ export class AgentService {
       run_id: runId,
       project_id: projectId,
     });
+  }
+
+  private async cancelActiveRunsForProject(projectId: number): Promise<void> {
+    const activeRuns = await this.db
+      .select({ id: schema.agentRuns.id })
+      .from(schema.agentRuns)
+      .where(
+        and(
+          eq(schema.agentRuns.projectId, projectId),
+          inArray(schema.agentRuns.status, ["queued", "running"]),
+        ),
+      );
+
+    for (const run of activeRuns) {
+      await this.cancelGeneration(projectId, run.id);
+    }
   }
 
   async sendFeedback(projectId: number, runId: number, feedback: string, feedbackType?: string): Promise<void> {

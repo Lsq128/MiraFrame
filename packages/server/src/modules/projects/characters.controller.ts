@@ -18,7 +18,7 @@ import { eq } from "drizzle-orm";
 export class CharactersController {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
-    private readonly wsGateway: WsGateway,
+    @Inject(WsGateway) private readonly wsGateway: WsGateway,
   ) {}
 
   @Put(":id")

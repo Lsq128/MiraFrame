@@ -58,7 +58,7 @@ export function ChatPanel({
     (!!outlineForApproval && !outlineApproved) ||
     (awaitingConfirm && awaitingAgent === "outline" && !!recoveryGate?.story_outline);
   const showManualConfirm = awaitingConfirm && !showOutlinePreview && runMode !== "yolo";
-  const awaitingLabel = awaitingAgent === "outline" || awaitingAgent === "plan"
+  const awaitingLabel = awaitingAgent === "outline" || awaitingAgent === "outline"
     ? "项目规划已完成"
     : `${awaitingAgent || "AI"} 节点等待确认`;
 

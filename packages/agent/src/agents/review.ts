@@ -14,8 +14,6 @@ export class ReviewRuleEngine extends BaseAgent {
       outline_approval: "plan_outline",
       characters_approval: "plan_characters",
       shots_approval: "plan_shots",
-      character_images_approval: "render_characters",
-      shot_images_approval: "render_shots",
       compose_approval: "compose_videos",
     };
 
@@ -23,7 +21,7 @@ export class ReviewRuleEngine extends BaseAgent {
 
     return {
       currentStage: "review",
-      routeStage: targetStage,
+      routeStage: targetStage as Partial<Phase2StateType>["routeStage"],
       routeMode: "incremental",
       reviewRequested: false,
     };

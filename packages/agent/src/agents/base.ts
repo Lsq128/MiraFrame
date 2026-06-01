@@ -12,7 +12,27 @@ export interface AgentContext {
   /** Create a character record in the DB and notify frontend via WS */
   createCharacter: (character: { name: string; description: string }) => Promise<{ id: number }>;
   /** Create a shot record in the DB and notify frontend via WS */
-  createShot: (shot: { order: number; description: string; camera?: string; dialogue?: string; action?: string; scene?: string }) => Promise<{ id: number }>;
+  createShot: (shot: {
+    order: number;
+    description: string;
+    camera?: string;
+    dialogue?: string;
+    action?: string;
+    scene?: string;
+    lighting?: string;
+    prompt?: string;
+    imagePrompt?: string;
+    duration?: number;
+    motionNote?: string;
+  }) => Promise<{ id: number }>;
+  /** Generate character images based on existing character descriptions */
+  generateCharacterImage: () => Promise<void>;
+  /** Generate per-shot frame images from storyboard prompts */
+  generateShotFrames: () => Promise<void>;
+  /** Generate per-shot video clips from storyboard frames */
+  generateShotVideos: () => Promise<void>;
+  /** Compose shot clips into the final project output */
+  composeProjectVideo: () => Promise<void>;
 }
 
 export class BaseAgent {
