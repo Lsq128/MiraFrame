@@ -64,6 +64,7 @@ export const appConfig = registerAs("app", () => ({
   enableImageToVideo: process.env.ENABLE_IMAGE_TO_VIDEO === "true",
   videoImageMode: process.env.VIDEO_IMAGE_MODE || "first_frame",
   videoInlineLocalImages: process.env.VIDEO_INLINE_LOCAL_IMAGES !== "false",
+  ffmpegPath: process.env.FFMPEG_PATH || "ffmpeg",
   // 豆包
   doubaoApiKey: process.env.DOUBAO_API_KEY || null,
   doubaoVideoModel:

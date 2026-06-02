@@ -145,6 +145,17 @@ export class ProjectsController {
       .orderBy(asc(schema.messages.createdAt));
   }
 
+  @Get(":id/runs/latest")
+  async getLatestRun(@Param("id") id: string) {
+    const [run] = await this.db
+      .select()
+      .from(schema.agentRuns)
+      .where(eq(schema.agentRuns.projectId, parseInt(id)))
+      .orderBy(desc(schema.agentRuns.createdAt))
+      .limit(1);
+    return run || null;
+  }
+
   // ---- Outline ----
 
   @Get(":id/outline")

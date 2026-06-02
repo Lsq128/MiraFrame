@@ -249,6 +249,7 @@ export class AgentProcessor extends WorkerHost {
           .where(eq(schema.characters.projectId, projectId))
           .orderBy(asc(schema.characters.id));
 
+        const failures: string[] = [];
         for (const character of characters) {
           if (character.imageUrl) continue;
           const prompt = [
@@ -278,12 +279,16 @@ export class AgentProcessor extends WorkerHost {
             }
           } catch (err) {
             console.warn(`[processor] Character image generation failed for "${character.name}":`, err);
+            failures.push(character.name);
             await ctx.sendMessage(`角色「${character.name}」照片生成暂时失败，可稍后重新生成。`, {
               summary: "角色照片生成失败",
               progress: 0.38,
               stage: "plan_characters",
             });
           }
+        }
+        if (failures.length > 0) {
+          throw new Error(`角色照片生成失败：${failures.join("、")}。请稍后重试，已成功的角色照片会保留。`);
         }
       },
 
@@ -387,23 +392,32 @@ export class AgentProcessor extends WorkerHost {
 	          .where(eq(schema.shots.projectId, projectId))
 	          .orderBy(asc(schema.shots.order));
 
+	        const failures: number[] = [];
 	        for (const shot of shots) {
 	          if (shot.imageUrl) continue;
 	          const imagePrompt = shot.imagePrompt || buildShotImagePrompt(shot, latestVisualBible, project?.style);
-	          const imageUrl = await this.imageService.generateImage(imagePrompt);
-	          const [updated] = await this.db
-	            .update(schema.shots)
-	            .set({
-	              imagePrompt,
-	              imageUrl,
-	              updatedAt: new Date(),
-	            })
-	            .where(eq(schema.shots.id, shot.id))
-	            .returning();
+	          try {
+	            const imageUrl = await this.imageService.generateImage(imagePrompt);
+	            const [updated] = await this.db
+	              .update(schema.shots)
+	              .set({
+	                imagePrompt,
+	                imageUrl,
+	                updatedAt: new Date(),
+	              })
+	              .where(eq(schema.shots.id, shot.id))
+	              .returning();
 
-	          if (updated) {
-	            this.wsGateway.sendToProject(projectId, "shot_updated", { shot: toShotPayload(updated) });
+	            if (updated) {
+	              this.wsGateway.sendToProject(projectId, "shot_updated", { shot: toShotPayload(updated) });
+	            }
+	          } catch (err) {
+	            console.warn(`[processor] Shot frame generation failed for #${shot.order}:`, err);
+	            failures.push(shot.order);
 	          }
+	        }
+	        if (failures.length > 0) {
+	          throw new Error(`分镜帧生成失败：镜头 ${failures.join("、")}。请稍后重试，已成功的分镜帧会保留。`);
 	        }
 	      },
 
@@ -415,26 +429,39 @@ export class AgentProcessor extends WorkerHost {
 	          .where(eq(schema.shots.projectId, projectId))
 	          .orderBy(asc(schema.shots.order));
 
+	        const failures: number[] = [];
 	        for (const shot of shots) {
-	          if (shot.videoUrl) continue;
+	          if (shot.videoUrl && isPlayableVideoUrl(shot.videoUrl)) continue;
 	          const prompt = shot.prompt || buildShotVideoPrompt(shot, shot.imagePrompt || shot.description);
-	          const videoUrl = await this.videoService.generateVideo(prompt, {
-	            imageUrl: shot.imageUrl,
-	            duration: shot.duration,
-	          });
-	          const [updated] = await this.db
-	            .update(schema.shots)
-	            .set({
-	              prompt,
-	              videoUrl,
-	              updatedAt: new Date(),
-	            })
-	            .where(eq(schema.shots.id, shot.id))
-	            .returning();
+	          try {
+	            const videoUrl = await this.videoService.generateVideo(prompt, {
+	              imageUrl: shot.imageUrl,
+	              duration: shot.duration,
+	            });
+	            const [updated] = await this.db
+	              .update(schema.shots)
+	              .set({
+	                prompt,
+	                videoUrl,
+	                updatedAt: new Date(),
+	              })
+	              .where(eq(schema.shots.id, shot.id))
+	              .returning();
 
-	          if (updated) {
-	            this.wsGateway.sendToProject(projectId, "shot_updated", { shot: toShotPayload(updated) });
+	            if (updated) {
+	              this.wsGateway.sendToProject(projectId, "shot_updated", { shot: toShotPayload(updated) });
+	            }
+	          } catch (err) {
+	            console.warn(`[processor] Shot video generation failed for #${shot.order}:`, err);
+	            failures.push(shot.order);
+	            await this.db
+	              .update(schema.shots)
+	              .set({ videoUrl: null, updatedAt: new Date() })
+	              .where(eq(schema.shots.id, shot.id));
 	          }
+	        }
+	        if (failures.length > 0) {
+	          throw new Error(`镜头视频生成失败：镜头 ${failures.join("、")}。请检查视频额度或稍后重试，已成功的视频会保留。`);
 	        }
 	      },
 
@@ -445,8 +472,12 @@ export class AgentProcessor extends WorkerHost {
 	          .from(schema.shots)
 	          .where(eq(schema.shots.projectId, projectId))
 	          .orderBy(asc(schema.shots.order));
+	        const missing = shots.filter((shot) => !shot.videoUrl || !isPlayableVideoUrl(shot.videoUrl));
+	        if (missing.length > 0) {
+	          throw new Error(`还有 ${missing.length} 个镜头视频未完成，无法合成最终输出。`);
+	        }
 	        const clipUrls = shots.map((shot) => shot.videoUrl).filter((url): url is string => Boolean(url));
-	        const videoUrl = clipUrls.length > 0 ? this.videoService.composeVideo(clipUrls) : null;
+	        const videoUrl = clipUrls.length > 0 ? await this.videoService.composeVideo(projectId, clipUrls) : null;
 
 	        await this.db
 	          .update(schema.projects)
@@ -773,4 +804,8 @@ function buildShotVideoPrompt(
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function isPlayableVideoUrl(url: string): boolean {
+  return /\.(mp4|webm|mov)(\?|#|$)/i.test(url) || url.includes(".oss-") && url.includes(".mp4");
 }

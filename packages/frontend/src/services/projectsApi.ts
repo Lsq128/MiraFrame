@@ -81,6 +81,11 @@ export const projectsApi = {
   getMessages: async (id: number) =>
     (await fetchApi<Array<Message | ServerMessage>>(`/api/v1/projects/${id}/messages`)).map(normalizeMessage),
 
+  getLatestRun: async (id: number) => {
+    const run = await fetchApi<AgentRun | ServerAgentRun | null>(`/api/v1/projects/${id}/runs/latest`);
+    return run ? normalizeAgentRun(run) : null;
+  },
+
   generate: (
     id: number,
     data?: { seed?: number; notes?: string; auto_mode?: boolean; target_stage?: string },
@@ -177,6 +182,17 @@ type ServerShot = Shot & {
   motionNote?: Shot["motion_note"];
 };
 
+type ServerAgentRun = AgentRun & {
+  projectId?: AgentRun["project_id"];
+  currentAgent?: AgentRun["current_agent"];
+  threadId?: AgentRun["thread_id"];
+  resourceType?: AgentRun["resource_type"];
+  resourceId?: AgentRun["resource_id"];
+  providerSnapshot?: AgentRun["provider_snapshot"];
+  createdAt?: AgentRun["created_at"];
+  updatedAt?: AgentRun["updated_at"];
+};
+
 function normalizeProject(project: Project | ServerProject): Project {
   const p = project as ServerProject;
   return {
@@ -231,5 +247,20 @@ function normalizeShot(shot: Shot | ServerShot): Shot {
     video_url: s.video_url ?? s.videoUrl ?? null,
     image_prompt: s.image_prompt ?? s.imagePrompt ?? undefined,
     motion_note: s.motion_note ?? s.motionNote ?? undefined,
+  };
+}
+
+function normalizeAgentRun(run: AgentRun | ServerAgentRun): AgentRun {
+  const r = run as ServerAgentRun;
+  return {
+    ...r,
+    project_id: r.project_id ?? r.projectId ?? 0,
+    current_agent: r.current_agent ?? r.currentAgent ?? undefined,
+    thread_id: r.thread_id ?? r.threadId ?? undefined,
+    resource_type: r.resource_type ?? r.resourceType ?? undefined,
+    resource_id: r.resource_id ?? r.resourceId ?? undefined,
+    provider_snapshot: r.provider_snapshot ?? r.providerSnapshot ?? null,
+    created_at: r.created_at ?? r.createdAt ?? "",
+    updated_at: r.updated_at ?? r.updatedAt ?? "",
   };
 }
