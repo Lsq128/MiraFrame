@@ -7,6 +7,8 @@ import { projectsApi } from "@/services/projectsApi";
 import { useThemeStore } from "@/stores/themeStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { cn } from "@/lib/utils";
+import { BRAND } from "@/lib/brand";
+import { Moon, Settings, Sparkles, Sun, Trash2 } from "lucide-react";
 import type { Project } from "@/types";
 
 export default function ProjectsPage() {
@@ -66,18 +68,21 @@ export default function ProjectsPage() {
     <div className="min-h-screen bg-base-100">
       {/* Header */}
       <header className="flex items-center justify-between px-4 h-10 border-b border-base-300">
-        <Link to="/" className="font-comic text-lg text-primary font-bold">
-          openOii
+        <Link to="/" className="flex items-center gap-2 text-sm font-semibold">
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          {BRAND.name}
         </Link>
         <div className="flex items-center gap-1">
           <Link to="/" className="btn btn-ghost btn-xs">
             新建
           </Link>
           <button onClick={toggleTheme} className="btn btn-ghost btn-xs btn-circle" aria-label="主题">
-            {isDark ? "☀️" : "🌙"}
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
           <button onClick={openSettings} className="btn btn-ghost btn-xs btn-circle" aria-label="设置">
-            ⚙
+            <Settings className="h-4 w-4" />
           </button>
         </div>
       </header>
@@ -85,7 +90,8 @@ export default function ProjectsPage() {
       <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Sub-header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold underline-sketch mb-3">全部项目</h1>
+          <h1 className="text-2xl font-semibold mb-2">全部项目</h1>
+          <p className="mb-4 text-sm text-muted-foreground">管理 {BRAND.cnName} 里的漫剧项目与生成记录。</p>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
               <input
@@ -161,7 +167,7 @@ export default function ProjectsPage() {
                     className="opacity-0 group-hover:opacity-100 p-2 hover:bg-error/10 rounded-lg transition-all"
                     title="删除"
                   >
-                    🗑
+                    <Trash2 className="h-4 w-4 text-error" />
                   </button>
                 </div>
               </Link>

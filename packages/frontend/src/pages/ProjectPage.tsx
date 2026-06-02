@@ -33,6 +33,7 @@ import { useChatPanelStore } from "@/stores/chatPanelStore";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { projectsApi } from "@/services/projectsApi";
 import { cn } from "@/lib/utils";
+import { BRAND } from "@/lib/brand";
 import type { Character, Shot } from "@/types";
 
 export default function ProjectPage() {
@@ -76,8 +77,6 @@ export default function ProjectPage() {
   const setProjectOutlineApproved = useProjectStore((s) => s.setProjectOutlineApproved);
 
   // Local UI
-  const [assetsOpen, setAssetsOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const autoStartTriggered = useRef(false);
   const generateRequestToken = useRef(0);
   const openChatPanel = useChatPanelStore((s) => s.open);
@@ -272,10 +271,7 @@ export default function ProjectPage() {
 
   return (
     <div className="h-screen flex flex-col bg-base-100">
-      <TopBar
-        onToggleAssets={() => setAssetsOpen(!assetsOpen)} onToggleHistory={() => setHistoryOpen(!historyOpen)}
-        assetsOpen={assetsOpen} historyOpen={historyOpen} projectId={projectId}
-      />
+      <TopBar />
       <StagePipeline currentStage={currentStage} isGenerating={isGenerating} awaitingConfirm={awaitingConfirm} hasRecovery={hasRecovery} onResume={() => {}} onCancel={handleCancel} stages={topStages} />
       <div className="flex flex-1 overflow-hidden">
         {/* Canvas — reads from store (real-time WS updates) */}
@@ -412,12 +408,12 @@ function CanvasArea({
   ];  const selectedNode = nodes.find((node) => node.id === selectedNodeId) || nodes[0];
 
   return (
-    <div className="flex-1 overflow-hidden bg-[#f7f8fb]">
+    <div className="flex-1 overflow-hidden bg-background">
       <div className="h-full flex flex-col">
-        <div className="h-12 shrink-0 border-b border-base-300 bg-base-100 px-4 flex items-center justify-between">
+        <div className="min-h-14 shrink-0 border-b border-base-300 bg-base-100 px-4 py-2 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-semibold truncate">{projectTitle || "AI 漫剧工作台"}</p>
-            <p className="text-xs text-muted-foreground">节点化生成流程</p>
+            <p className="text-sm font-semibold truncate">{projectTitle || BRAND.fullName}</p>
+            <p className="text-xs text-muted-foreground">{BRAND.cnName} 项目工作台</p>
           </div>
           <div className="flex items-center gap-2">
             {(awaitingConfirm || needsOutlineApproval) && (
@@ -838,7 +834,7 @@ function NodeDetail({
                   {isFinalVideoUrl(projectVideoUrl) ? "打开输出视频" : "查看合成预览"}
                 </a>
                 {isFinalVideoUrl(projectVideoUrl) && (
-                  <a href={projectVideoUrl} download={`openoii-project-video-${Date.now()}.mp4`} className="btn btn-primary btn-sm">
+                  <a href={projectVideoUrl} download={`miraframe-project-video-${Date.now()}.mp4`} className="btn btn-primary btn-sm">
                     <Download className="h-4 w-4" />
                     导出成片
                   </a>

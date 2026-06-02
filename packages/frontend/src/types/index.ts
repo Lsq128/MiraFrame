@@ -565,35 +565,6 @@ export interface ConfigSection {
 
 export type AppConfig = ConfigItem[];
 
-// --- Asset Management ---
-export interface Asset {
-  id: number;
-  name: string;
-  asset_type: "character" | "scene";
-  description?: string;
-  image_url?: string;
-  metadata_json?: Record<string, unknown>;
-  source_project_id?: number;
-  tags?: string[];
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AssetList {
-  items: Asset[];
-  total: number;
-}
-
-export interface AssetCreatePayload {
-  name: string;
-  asset_type: "character" | "scene";
-  description?: string;
-  image_url?: string;
-  metadata_json?: Record<string, unknown>;
-  source_project_id?: number;
-  tags?: string[];
-}
-
 // --- Style Templates ---
 export interface StyleTemplate {
   id: number;

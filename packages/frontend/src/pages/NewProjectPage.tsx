@@ -7,6 +7,8 @@ import { projectsApi } from "@/services/projectsApi";
 import { universesApi } from "@/services/universesApi";
 import { styleTemplatesApi } from "@/services/styleTemplatesApi";
 import { cn } from "@/lib/utils";
+import { BRAND } from "@/lib/brand";
+import { ArrowLeft, Check, Sparkles } from "lucide-react";
 import type { CreateProjectPayload, ProjectProviderOverridesPayload } from "@/types";
 
 type ProviderKey = string | null;
@@ -86,12 +88,19 @@ export default function NewProjectPage() {
   const categories = [...new Set(STYLES.map((s) => s.category))];
 
   return (
-    <div className="min-h-screen bg-base-100">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="flex items-center px-4 h-12 border-b border-base-300">
+      <header className="flex items-center justify-between px-4 h-12 border-b border-base-300 bg-base-100">
         <Link to="/" className="text-sm text-muted-foreground hover:text-base-content flex items-center gap-1">
-          ← 返回
+          <ArrowLeft className="h-4 w-4" />
+          返回
         </Link>
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          {BRAND.name}
+        </div>
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-8">
@@ -105,7 +114,7 @@ export default function NewProjectPage() {
                   step > s ? "bg-success text-success-content" : step === s ? "bg-primary text-primary-foreground" : "bg-base-300 text-muted-foreground",
                 )}
               >
-                {step > s ? "✓" : s}
+                {step > s ? <Check className="h-4 w-4" /> : s}
               </div>
               {s < 3 && <div className={cn("w-8 h-0.5", step > s ? "bg-success" : "bg-base-300")} />}
             </div>
@@ -179,7 +188,7 @@ export default function NewProjectPage() {
                         className={cn(
                           "px-3 py-1.5 text-sm rounded-full border transition-all",
                           form.style === s.slug
-                            ? "bg-primary text-primary-content border-primary shadow-md -translate-y-0.5"
+                          ? "bg-primary text-primary-foreground border-primary shadow-md -translate-y-0.5"
                             : "bg-base-100 border-base-300 hover:border-primary/50",
                         )}
                       >
@@ -210,7 +219,7 @@ export default function NewProjectPage() {
                         className={cn(
                           "px-2 py-1 text-xs rounded border transition-colors",
                           (form[`${modality}_provider_override` as keyof FormData] ?? null) === (opt === "inherit-default" ? null : opt)
-                            ? "bg-primary text-primary-content border-primary"
+                            ? "bg-primary text-primary-foreground border-primary"
                             : "bg-base-200 border-base-300 hover:border-primary/50",
                         )}
                       >

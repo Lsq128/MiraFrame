@@ -15,7 +15,7 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import { DRIZZLE, type Db, schema } from "../../db";
 import { WsGateway } from "../../ws";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, inArray } from "drizzle-orm";
 
 // ---- Projects CRUD ----
 
@@ -105,11 +105,13 @@ export class ProjectsController {
   @Post("batch-delete")
   @HttpCode(HttpStatus.OK)
   async deleteMany(@Body() body: { ids: number[] }) {
-    if (!body.ids?.length) return { deleted: 0 };
-    const result = await this.db
+    const ids = [...new Set((body.ids || []).map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+    if (ids.length === 0) return { deleted: 0 };
+    const deleted = await this.db
       .delete(schema.projects)
-      .where(eq(schema.projects.id, body.ids[0]!)); // Simplified — iterate in production
-    return { deleted: body.ids.length };
+      .where(inArray(schema.projects.id, ids))
+      .returning({ id: schema.projects.id });
+    return { deleted: deleted.length };
   }
 
   // ---- Characters under project ----

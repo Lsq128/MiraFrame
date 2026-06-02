@@ -1,42 +1,43 @@
+@import url("https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap");
 @import "tailwindcss";
 
 @theme {
   /* shadcn/ui tokens */
-  --color-primary: #3b82f6;
+  --color-primary: #2563eb;
   --color-primary-foreground: #ffffff;
-  --color-secondary: #6b7280;
-  --color-secondary-foreground: #ffffff;
+  --color-secondary: #14b8a6;
+  --color-secondary-foreground: #042f2e;
   --color-destructive: #ef4444;
   --color-destructive-foreground: #ffffff;
-  --color-muted: #6b7280;
-  --color-muted-foreground: #9ca3af;
-  --color-accent: #f3f4f6;
-  --color-accent-foreground: #111827;
+  --color-muted: #64748b;
+  --color-muted-foreground: #64748b;
+  --color-accent: #fff7ed;
+  --color-accent-foreground: #172033;
   --color-card: #ffffff;
-  --color-card-foreground: #111827;
-  --color-border: #e5e7eb;
-  --color-input: #e5e7eb;
-  --color-ring: #3b82f6;
-  --color-background: #f9fafb;
-  --color-foreground: #111827;
+  --color-card-foreground: #172033;
+  --color-border: #dbe3ee;
+  --color-input: #dbe3ee;
+  --color-ring: #2563eb;
+  --color-background: #f6f7fb;
+  --color-foreground: #172033;
 
   /* DaisyUI-compatible tokens */
   --color-base-100: #ffffff;
-  --color-base-200: #f3f4f6;
-  --color-base-300: #e5e7eb;
-  --color-base-content: #111827;
-  --color-success: #22c55e;
+  --color-base-200: #f3f6fb;
+  --color-base-300: #dbe3ee;
+  --color-base-content: #172033;
+  --color-success: #16a34a;
   --color-success-content: #ffffff;
-  --color-warning: #f59e0b;
-  --color-warning-content: #000000;
-  --color-error: #ef4444;
+  --color-warning: #f97316;
+  --color-warning-content: #ffffff;
+  --color-error: #dc2626;
   --color-error-content: #ffffff;
-  --color-info: #3b82f6;
+  --color-info: #0ea5e9;
   --color-info-content: #ffffff;
 
   /* Special fonts */
-  --font-comic: "Comic Sans MS", "Chalkboard SE", cursive;
-  --font-heading: "Inter", system-ui, sans-serif;
+  --font-comic: "ZCOOL KuaiLe", "Hannotate SC", "Comic Sans MS", "DFKai-SB", "KaiTi", "STKaiti", "PingFang SC", cursive;
+  --font-heading: "ZCOOL KuaiLe", "Hannotate SC", "Comic Sans MS", "DFKai-SB", "KaiTi", "STKaiti", "PingFang SC", cursive;
 }
 
 @layer base {
@@ -45,6 +46,28 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-comic);
+    letter-spacing: 0;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    letter-spacing: 0;
+    font-weight: 700;
+  }
+
+  button {
+    font-family: var(--font-comic);
+    letter-spacing: 0;
+    font-weight: 600;
+  }
+
+  input, textarea, select {
+    font-family: var(--font-comic);
+    letter-spacing: 0;
+    font-weight: 400;
   }
 }
 
@@ -56,11 +79,11 @@
 }
 
 @utility shadow-brutal {
-  box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 20px 45px rgba(23, 32, 51, 0.10);
 }
 
 @utility halftone-bg {
-  background-image: radial-gradient(circle, rgba(128, 128, 128, 0.08) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(37, 99, 235, 0.07) 1px, transparent 1px);
   background-size: 16px 16px;
 }
 
@@ -287,13 +310,13 @@
 /* ---- Card classes ---- */
 @utility card {
   background-color: var(--color-base-100);
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   border: 1px solid var(--color-base-300);
   overflow: hidden;
 }
 
 @utility card-comic {
-  border: 2px solid rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(37, 99, 235, 0.18);
 }
 
 /* ---- Alert ---- */
