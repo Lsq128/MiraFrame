@@ -8,15 +8,18 @@ import {
   CheckCircle2,
   Clock3,
   Download,
+  ExternalLink,
   FileText,
   Film,
   Image,
   Info,
+  Maximize2,
   Play,
   RefreshCw,
   TriangleAlert,
   Sparkles,
   Users,
+  X,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { StagePipeline } from "@/components/layout/StagePipeline";
@@ -60,6 +63,11 @@ export default function ProjectPage() {
   const awaitingConfirm = useRunStore((s) => s.awaitingConfirm);
   const awaitingAgent = useRunStore((s) => s.awaitingAgent);
   const recoveryControl = useRunStore((s) => s.recoveryControl);
+  const projectVideoUrl = useProjectStore((s) => s.projectVideoUrl);
+  const storyOutline = useProjectStore((s) => s.projectStoryOutline);
+  const outlineApproved = useProjectStore((s) => s.projectOutlineApproved);
+  const characters = useCharacterStore((s) => s.characters);
+  const shots = useShotStore((s) => s.shots);
   const setGenerating = useRunStore((s) => s.setGenerating);
   const setCurrentStage = useRunStore((s) => s.setCurrentStage);
   const setCurrentRunId = useRunStore((s) => s.setCurrentRunId);
@@ -249,6 +257,18 @@ export default function ProjectPage() {
   if (projectQuery.isError || !projectQuery.data) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><p className="text-lg font-medium">项目未找到</p><button onClick={() => navigate("/")} className="btn btn-primary">返回首页</button></div>;
 
   const hasRecovery = recoveryControl?.state === "recoverable";
+  const topStages = buildMaterialStages({
+    currentStage,
+    isGenerating,
+    awaitingConfirm,
+    awaitingAgent,
+    outline: storyOutline as unknown as Record<string, unknown> | null,
+    outlineApproved,
+    characters,
+    shots,
+    projectVideoUrl,
+    latestRunError: latestRunQuery.data?.error || null,
+  });
 
   return (
     <div className="h-screen flex flex-col bg-base-100">
@@ -256,7 +276,7 @@ export default function ProjectPage() {
         onToggleAssets={() => setAssetsOpen(!assetsOpen)} onToggleHistory={() => setHistoryOpen(!historyOpen)}
         assetsOpen={assetsOpen} historyOpen={historyOpen} projectId={projectId}
       />
-      <StagePipeline currentStage={currentStage} isGenerating={isGenerating} awaitingConfirm={awaitingConfirm} hasRecovery={hasRecovery} onResume={() => {}} onCancel={handleCancel} />
+      <StagePipeline currentStage={currentStage} isGenerating={isGenerating} awaitingConfirm={awaitingConfirm} hasRecovery={hasRecovery} onResume={() => {}} onCancel={handleCancel} stages={topStages} />
       <div className="flex flex-1 overflow-hidden">
         {/* Canvas — reads from store (real-time WS updates) */}
         <CanvasArea
@@ -421,11 +441,11 @@ function CanvasArea({
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 grid grid-cols-[minmax(680px,1fr)_420px] overflow-hidden">
+        <div className="flex-1 min-h-0 grid grid-cols-1 grid-rows-[minmax(320px,0.9fr)_minmax(360px,1.1fr)] xl:grid-cols-[minmax(620px,1fr)_520px] xl:grid-rows-1 overflow-hidden">
           <div className="relative overflow-auto halftone-bg">
-            <div className="relative min-h-[640px] min-w-[860px] p-8">
+            <div className="relative min-h-[620px] min-w-[720px] p-8">
               <WorkflowConnectors />
-              <div className="grid grid-cols-3 gap-x-14 gap-y-12 relative z-10">
+              <div className="grid grid-cols-2 gap-x-12 gap-y-8 relative z-10 max-w-[720px]">
                 {nodes.map((node, index) => (
                   <WorkflowNodeCard
                     ref={(element) => { nodeRefs.current[node.id] = element; }}
@@ -440,7 +460,7 @@ function CanvasArea({
             </div>
           </div>
 
-          <aside className="border-l border-base-300 bg-base-100 overflow-y-auto">
+          <aside className="border-t xl:border-t-0 xl:border-l border-base-300 bg-base-100 overflow-y-auto">
             <NodeDetail
               selectedNode={selectedNode}
               outline={outlineRecord}
@@ -477,6 +497,70 @@ interface WorkflowNode {
   metric: string;
 }
 
+function buildMaterialStages({
+  currentStage,
+  isGenerating,
+  awaitingConfirm,
+  awaitingAgent,
+  outline,
+  outlineApproved,
+  characters,
+  shots,
+  projectVideoUrl,
+  latestRunError,
+}: {
+  currentStage: string;
+  isGenerating: boolean;
+  awaitingConfirm: boolean;
+  awaitingAgent: string | null;
+  outline: Record<string, unknown> | null;
+  outlineApproved: boolean;
+  characters: Character[];
+  shots: Shot[];
+  projectVideoUrl: string | null;
+  latestRunError: string | null;
+}): Array<{ key: string; label: string; metric: string; status: WorkflowStatus }> {
+  const hasOutline = !!outline && Object.keys(outline).length > 0;
+  const characterImageCount = characters.filter((c) => !!c.image_url).length;
+  const allCharacterImages = characters.length > 0 && characterImageCount === characters.length;
+  const playableVideoCount = shots.filter((s) => isPlayableVideoUrl(s.video_url)).length;
+  const allShotVideos = shots.length > 0 && playableVideoCount === shots.length;
+  const hasError = !!latestRunError && !isGenerating;
+
+  return [
+    {
+      key: "outline",
+      label: "故事大纲",
+      metric: hasOutline ? (outlineApproved ? "已确认" : "待确认") : "待生成",
+      status: hasOutline ? (!outlineApproved || awaitingAgent === "outline" && awaitingConfirm ? "review" : "done") : currentStage === "outline" && isGenerating ? "active" : "pending",
+    },
+    {
+      key: "characters",
+      label: "角色设定",
+      metric: characters.length ? `${characterImageCount}/${characters.length} 图` : "待生成",
+      status: allCharacterImages ? "done" : characters.length > 0 && hasError ? "error" : currentStage === "characters" && isGenerating || currentStage === "characters_approval" ? "active" : hasOutline && outlineApproved && isGenerating ? "active" : "pending",
+    },
+    {
+      key: "shots",
+      label: "分镜脚本",
+      metric: shots.length ? `${shots.length} 镜` : "待生成",
+      status: shots.length > 0 ? (awaitingAgent === "shots" && awaitingConfirm ? "review" : "done") : currentStage === "shots" && isGenerating || currentStage === "shots_approval" && isGenerating ? "active" : "pending",
+    },
+    {
+      key: "shotImages",
+      label: "镜头画面",
+      metric: `${playableVideoCount}/${shots.length || 0} 视频`,
+      status: allShotVideos ? "done" : shots.length > 0 && hasError ? "error" : currentStage === "shot_images" && isGenerating || playableVideoCount > 0 ? "active" : "pending",
+    },
+    {
+      key: "output",
+      label: "合成输出",
+      metric: isFinalVideoUrl(projectVideoUrl) ? "可导出" : allShotVideos ? "待合成" : "待生成",
+      status: isFinalVideoUrl(projectVideoUrl) ? "done" : currentStage === "output" && isGenerating ? "active" : projectVideoUrl && isInternalCompositionUrl(projectVideoUrl) ? "error" : allShotVideos ? "active" : "pending",
+    },
+  ];
+}
+
 const WorkflowNodeCard = forwardRef<HTMLButtonElement, {
   node: WorkflowNode;
   index: number;
@@ -489,17 +573,16 @@ const WorkflowNodeCard = forwardRef<HTMLButtonElement, {
   onSelect,
 }, ref) {
   const Icon = node.icon;
-  const column = index % 3;
-  const shouldOffset = column === 1;
+  const shouldOffset = index % 2 === 1;
 
   return (
     <button
       ref={ref}
       onClick={onSelect}
       className={cn(
-        "h-[148px] text-left rounded-lg border bg-base-100 p-4 transition-all relative",
-        shouldOffset && "translate-y-8",
-        selected ? "border-primary shadow-[0_0_0_3px_rgba(59,130,246,0.12)]" : "border-base-300 hover:border-primary/40",
+        "min-h-[156px] text-left rounded-lg border bg-base-100 p-4 transition-all relative shadow-sm",
+        shouldOffset && "translate-y-6",
+        selected ? "border-primary shadow-[0_0_0_3px_rgba(59,130,246,0.12),0_16px_34px_rgba(15,23,42,0.08)]" : "border-base-300 hover:border-primary/40 hover:shadow-md",
         node.status === "active" && "ring-2 ring-warning/30",
         node.status === "review" && "ring-2 ring-primary/30",
         node.status === "error" && "ring-2 ring-error/30",
@@ -518,11 +601,11 @@ const WorkflowNodeCard = forwardRef<HTMLButtonElement, {
         </div>
         <StatusBadge status={node.status} />
       </div>
-      <div className="mt-4">
+      <div className="mt-4 pr-1">
         <p className="text-sm font-semibold">{node.label}</p>
         <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{node.description}</p>
       </div>
-      <div className="absolute left-4 bottom-3 text-xs font-medium text-base-content">{node.metric}</div>
+      <div className="mt-4 text-xs font-medium text-base-content">{node.metric}</div>
     </button>
   );
 });
@@ -535,10 +618,10 @@ function WorkflowConnectors() {
           <path d="M0,0 L8,4 L0,8 Z" fill="#cbd5e1" />
         </marker>
       </defs>
-      <path d="M260 100 C335 100, 335 132, 410 132" stroke="#cbd5e1" strokeWidth="2" fill="none" markerEnd="url(#workflow-arrow)" />
-      <path d="M600 132 C675 132, 675 100, 750 100" stroke="#cbd5e1" strokeWidth="2" fill="none" markerEnd="url(#workflow-arrow)" />
-      <path d="M750 235 C675 290, 335 290, 260 347" stroke="#cbd5e1" strokeWidth="2" fill="none" markerEnd="url(#workflow-arrow)" />
-      <path d="M260 347 C335 347, 335 379, 410 379" stroke="#cbd5e1" strokeWidth="2" fill="none" markerEnd="url(#workflow-arrow)" />
+      <path d="M270 108 C350 108, 350 128, 430 128" stroke="#cbd5e1" strokeWidth="2" fill="none" markerEnd="url(#workflow-arrow)" />
+      <path d="M430 250 C350 300, 350 300, 270 350" stroke="#cbd5e1" strokeWidth="2" fill="none" markerEnd="url(#workflow-arrow)" />
+      <path d="M270 350 C350 350, 350 370, 430 370" stroke="#cbd5e1" strokeWidth="2" fill="none" markerEnd="url(#workflow-arrow)" />
+      <path d="M430 490 C350 545, 270 545, 190 555" stroke="#cbd5e1" strokeWidth="2" fill="none" markerEnd="url(#workflow-arrow)" />
     </svg>
   );
 }
@@ -596,6 +679,7 @@ function NodeDetail({
   onRetryMaterials: () => void;
   onConfirm: (feedback?: string) => void;
 }) {
+  const [preview, setPreview] = useState<MediaPreview | null>(null);
   const missingCharacterImages = characters.filter((c) => !c.image_url);
   const playableVideoCount = shots.filter((s) => isPlayableVideoUrl(s.video_url)).length;
   const missingShotVideos = shots.filter((s) => !isPlayableVideoUrl(s.video_url));
@@ -660,53 +744,106 @@ function NodeDetail({
         )}
 
         {selectedNode.id === "characters" && (
-        <div className="grid grid-cols-2 gap-3">
-          {characters.length === 0 ? <EmptyNodeContent text="角色设定尚未生成" /> : characters.slice(0, 6).map((c) => (
-            <div key={c.id} className="rounded-lg border border-base-200 overflow-hidden bg-base-100">
-              {c.image_url ? (
-                <img src={c.image_url} alt={c.name} className="h-32 w-full object-cover" />
-              ) : (
-                <div className="h-32 w-full bg-base-200 flex items-center justify-center text-xs text-muted-foreground">等待角色图</div>
-              )}
-              <div className="p-3">
-                <p className="text-sm font-medium truncate">{c.name}</p>
-                <p className="text-xs text-muted-foreground line-clamp-3 mt-1">{c.description}</p>
+          <div className="space-y-3">
+            {characters.length === 0 ? <EmptyNodeContent text="角色设定尚未生成" /> : characters.map((c) => (
+              <div key={c.id} className="rounded-lg border border-base-200 bg-base-100 p-3">
+                <div className="grid grid-cols-[148px_1fr] gap-3">
+                  <MediaTile
+                    title={c.name}
+                    url={c.image_url || null}
+                    kind="image"
+                    emptyText="等待角色图"
+                    onOpen={setPreview}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">{c.name}</p>
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed mt-2">{c.description || "暂无角色介绍"}</p>
+                    {c.visual_notes && (
+                      <div className="mt-3 rounded-md bg-base-200/70 p-2">
+                        <p className="text-[11px] font-medium text-muted-foreground mb-1">视觉设定</p>
+                        <p className="text-xs whitespace-pre-wrap leading-relaxed">{c.visual_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
         )}
 
         {selectedNode.id === "shots" && (
-        <div className="space-y-2">
-          {shots.length === 0 ? <EmptyNodeContent text="分镜脚本尚未生成" /> : shots.slice(0, 6).map((shot) => (
-            <div key={shot.id} className="rounded-lg border border-base-200 p-3">
+          <div className="space-y-3">
+          {shots.length === 0 ? <EmptyNodeContent text="分镜脚本尚未生成" /> : shots.map((shot) => (
+            <div key={shot.id} className="rounded-lg border border-base-200 bg-base-100 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold text-muted-foreground">镜头 {shot.order}</p>
                 <span className="text-[11px] text-muted-foreground">{shot.duration ? `${shot.duration}s` : ""}</span>
               </div>
-              <p className="text-sm line-clamp-3 mt-1">{shot.description || shot.prompt}</p>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed mt-2">{shot.description || shot.prompt || "暂无镜头描述"}</p>
+              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                {shot.scene && <ShotMeta label="场景" value={shot.scene} />}
+                {shot.camera && <ShotMeta label="镜头" value={shot.camera} />}
+                {shot.action && <ShotMeta label="动作" value={shot.action} />}
+                {shot.expression && <ShotMeta label="表情" value={shot.expression} />}
+                {shot.lighting && <ShotMeta label="光线" value={shot.lighting} />}
+                {shot.dialogue && <ShotMeta label="台词" value={shot.dialogue} />}
+              </dl>
+              {shot.image_prompt && (
+                <div className="mt-3 rounded-md bg-base-200/70 p-2">
+                  <p className="text-[11px] font-medium text-muted-foreground mb-1">图像提示词</p>
+                  <p className="text-xs whitespace-pre-wrap leading-relaxed">{shot.image_prompt}</p>
+                </div>
+              )}
             </div>
           ))}
-        </div>
+          </div>
         )}
 
 
 
         {selectedNode.id === "shotImages" && (
-          <AssetStrip emptyText="镜头视频尚未生成" items={shots.map((s) => ({ id: s.id, title: `镜头 ${s.order}`, url: playableOrPreviewUrl(s), issue: videoIssue(s) }))} />
+          <AssetStrip
+            emptyText="镜头视频尚未生成"
+            items={shots.map((s) => ({
+              id: s.id,
+              title: `镜头 ${s.order}`,
+              url: playableOrPreviewUrl(s),
+              posterUrl: s.image_url || null,
+              kind: isPlayableVideoUrl(s.video_url) ? "video" : "image",
+              issue: videoIssue(s),
+            }))}
+            onOpen={setPreview}
+          />
         )}
 
         {selectedNode.id === "output" && (
-        <div className="rounded-lg border border-base-200 p-4 text-sm">
+        <div className="rounded-lg border border-base-200 bg-base-100 p-4 text-sm">
           {projectVideoUrl && !isInternalCompositionUrl(projectVideoUrl) ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {isFinalVideoUrl(projectVideoUrl) ? (
-                <video src={projectVideoUrl} className="w-full rounded-lg border border-base-200 bg-black" controls />
+                <button
+                  type="button"
+                  onClick={() => setPreview({ title: "合成输出", url: projectVideoUrl, kind: "video" })}
+                  className="group w-full rounded-lg border border-base-200 bg-black overflow-hidden relative"
+                >
+                  <video src={projectVideoUrl} className="w-full max-h-[320px] bg-black object-contain" controls />
+                  <span className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                    <Maximize2 className="h-4 w-4" />
+                  </span>
+                </button>
               ) : null}
-              <a href={projectVideoUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
-                {isFinalVideoUrl(projectVideoUrl) ? "打开输出视频" : "查看合成预览"}
-              </a>
+              <div className="flex flex-wrap items-center gap-2">
+                <a href={projectVideoUrl} target="_blank" rel="noreferrer" className="btn btn-outline btn-sm">
+                  <ExternalLink className="h-4 w-4" />
+                  {isFinalVideoUrl(projectVideoUrl) ? "打开输出视频" : "查看合成预览"}
+                </a>
+                {isFinalVideoUrl(projectVideoUrl) && (
+                  <a href={projectVideoUrl} download={`openoii-project-video-${Date.now()}.mp4`} className="btn btn-primary btn-sm">
+                    <Download className="h-4 w-4" />
+                    导出成片
+                  </a>
+                )}
+              </div>
               {!isFinalVideoUrl(projectVideoUrl) && (
                 <p className="text-xs text-muted-foreground">当前是按镜头顺序连续播放的合成预览，还不是单个 mp4 成片。</p>
               )}
@@ -726,6 +863,7 @@ function NodeDetail({
         </div>
         )}
       </div>
+      <MediaLightbox preview={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }
@@ -734,35 +872,151 @@ function EmptyNodeContent({ text }: { text: string }) {
   return <p className="col-span-3 rounded-md border border-dashed border-base-300 p-4 text-center text-xs text-muted-foreground">{text}</p>;
 }
 
+function ShotMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-base-200/70 p-2">
+      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-1 whitespace-pre-wrap leading-relaxed">{value}</dd>
+    </div>
+  );
+}
+
+type MediaPreview = {
+  title: string;
+  url: string;
+  kind: "image" | "video";
+  posterUrl?: string | null;
+};
+
+function MediaTile({
+  title,
+  url,
+  kind,
+  posterUrl,
+  emptyText,
+  issue,
+  onOpen,
+}: {
+  title: string;
+  url: string | null;
+  kind: "image" | "video";
+  posterUrl?: string | null;
+  emptyText: string;
+  issue?: string | null;
+  onOpen: (preview: MediaPreview) => void;
+}) {
+  if (!url) {
+    return (
+      <div className={cn("aspect-[4/3] w-full rounded-md border border-dashed bg-base-200 flex items-center justify-center text-xs text-muted-foreground", issue && "border-error/30 text-error")}>
+        {emptyText}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen({ title, url, kind, posterUrl })}
+      className={cn("group aspect-[4/3] w-full rounded-md border overflow-hidden bg-base-200 relative", issue ? "border-error/40" : "border-base-200")}
+      title={`查看${title}`}
+    >
+      {kind === "video" ? (
+        <>
+          {posterUrl ? (
+            <img src={posterUrl} alt={title} className="h-full w-full object-contain" />
+          ) : (
+            <video src={url} className="h-full w-full object-contain" muted preload="metadata" />
+          )}
+          <span className="absolute inset-0 flex items-center justify-center bg-black/10">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/65 text-white">
+              <Play className="h-5 w-5 fill-current" />
+            </span>
+          </span>
+        </>
+      ) : (
+        <img src={url} alt={title} className="h-full w-full object-contain" />
+      )}
+      <span className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100">
+        <Maximize2 className="h-3.5 w-3.5" />
+      </span>
+    </button>
+  );
+}
+
 function AssetStrip({
   items,
   emptyText,
+  onOpen,
 }: {
-  items: Array<{ id: number; title: string; url: string | null; issue?: string | null }>;
+  items: Array<{ id: number; title: string; url: string | null; kind: "image" | "video"; posterUrl?: string | null; issue?: string | null }>;
   emptyText: string;
+  onOpen: (preview: MediaPreview) => void;
 }) {
   const visible = items.filter((item) => item.url || item.issue);
   if (visible.length === 0) return <EmptyNodeContent text={emptyText} />;
 
   return (
     <div className="grid grid-cols-2 gap-3">
-	      {visible.slice(0, 8).map((item) => (
-	        <div key={item.id} className={cn("rounded-lg border overflow-hidden bg-base-100", item.issue ? "border-error/30" : "border-base-200")}>
-            {item.url ? (
-              isPlayableVideoUrl(item.url) ? (
-                <video src={item.url} className="h-28 w-full object-cover" controls />
-              ) : (
-                <img src={item.url} alt={item.title} className="h-28 w-full object-cover" />
-              )
-            ) : (
-              <div className="h-28 w-full bg-base-200 flex items-center justify-center text-xs text-muted-foreground">等待生成</div>
-            )}
+	      {visible.map((item) => (
+	        <div key={item.id} className={cn("rounded-lg border overflow-hidden bg-base-100 p-2", item.issue ? "border-error/30" : "border-base-200")}>
+            <MediaTile
+              title={item.title}
+              url={item.url}
+              kind={item.kind}
+              posterUrl={item.posterUrl}
+              emptyText="等待生成"
+              issue={item.issue}
+              onOpen={onOpen}
+            />
             <div className="px-2 py-2">
 	            <p className="text-xs font-medium truncate">{item.title}</p>
               {item.issue && <p className="text-[11px] text-error mt-1">{item.issue}</p>}
             </div>
 	        </div>
-	      ))}
+      ))}
+    </div>
+  );
+}
+
+function MediaLightbox({ preview, onClose }: { preview: MediaPreview | null; onClose: () => void }) {
+  useEffect(() => {
+    if (!preview) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, preview]);
+
+  if (!preview) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 p-5 flex flex-col">
+      <div className="flex items-center justify-between gap-3 text-white">
+        <p className="text-sm font-medium truncate">{preview.title}</p>
+        <div className="flex items-center gap-2">
+          <a href={preview.url} target="_blank" rel="noreferrer" className="btn btn-sm bg-white/10 text-white border-white/20 hover:bg-white/20">
+            <ExternalLink className="h-4 w-4" />
+            打开
+          </a>
+          {preview.kind === "video" && (
+            <a href={preview.url} download className="btn btn-sm bg-white text-black hover:bg-white/90">
+              <Download className="h-4 w-4" />
+              导出
+            </a>
+          )}
+          <button type="button" onClick={onClose} className="btn btn-circle bg-white/10 text-white border-white/20 hover:bg-white/20" aria-label="关闭预览">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 mt-4 flex items-center justify-center">
+        {preview.kind === "video" ? (
+          <video src={preview.url} poster={preview.posterUrl || undefined} className="max-h-full max-w-full rounded-lg bg-black" controls autoPlay />
+        ) : (
+          <img src={preview.url} alt={preview.title} className="max-h-full max-w-full rounded-lg object-contain" />
+        )}
+      </div>
     </div>
   );
 }
