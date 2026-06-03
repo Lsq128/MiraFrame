@@ -74,6 +74,7 @@ export async function planCharactersNode(state: Phase2StateType): Promise<Partia
     await ctx.generateCharacterImage();
   } catch (err) {
     console.warn("[planCharactersNode] Character image generation failed:", err);
+    throw err;
   }
 
   await ctx.sendMessage("角色设定完成", { progress: 0.4, stage: "plan_characters" });

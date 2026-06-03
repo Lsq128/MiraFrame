@@ -7,6 +7,7 @@ import { DRIZZLE, type Db } from "../db";
 import { WsGateway } from "../ws";
 import { and, eq, inArray, lt } from "drizzle-orm";
 import { schema } from "../db";
+import { RevisionService, type RevisionInput } from "./revision.service";
 
 export interface GenerationInput {
   projectId: number;
@@ -15,6 +16,11 @@ export interface GenerationInput {
   mode: "full" | "incremental";
   autoMode?: boolean;
   targetStage?: string;
+  feedback?: string;
+  feedbackType?: string;
+  entityType?: string;
+  entityId?: number;
+  revisionMode?: "stage" | "asset";
 }
 
 @Injectable()
@@ -25,6 +31,7 @@ export class AgentService implements OnApplicationBootstrap {
     @Inject(REDIS_SUBSCRIBER) private readonly redisSub: Redis,
     @Inject(DRIZZLE) private readonly db: Db,
     @Inject(WsGateway) private readonly wsGateway: WsGateway,
+    private readonly revisionService: RevisionService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -87,6 +94,10 @@ export class AgentService implements OnApplicationBootstrap {
         projectId: input.projectId,
         status: "queued",
         progress: 0,
+        routeDecision: input.feedbackType || null,
+        patchPlan: input.feedback || null,
+        resourceType: input.entityType || null,
+        resourceId: input.entityId || null,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -128,6 +139,43 @@ export class AgentService implements OnApplicationBootstrap {
         .where(eq(schema.agentRuns.id, runId));
       throw err;
     }
+
+    return runId;
+  }
+
+  async submitRevision(input: RevisionInput): Promise<number> {
+    const targetStage = this.revisionService.targetStageFor(input);
+
+    await this.db.insert(schema.messages).values({
+      projectId: input.projectId,
+      agent: "user",
+      role: "user",
+      content: this.revisionService.formatUserMessage(input),
+      summary: "用户提交修改反馈",
+      createdAt: new Date(),
+    });
+
+    await this.revisionService.prepareAssets(input);
+
+    const runId = await this.startGeneration({
+      projectId: input.projectId,
+      mode: "incremental",
+      autoMode: false,
+      targetStage,
+      feedback: input.content,
+      feedbackType: input.feedbackType,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      revisionMode: input.entityId ? "asset" : "stage",
+    });
+
+    this.wsGateway.sendToProject(input.projectId, "run_message", {
+      agent: "system",
+      role: "assistant",
+      content: this.revisionService.formatAcceptedMessage(input, targetStage),
+      summary: "修改任务已启动",
+      isLoading: false,
+    });
 
     return runId;
   }
@@ -192,4 +240,5 @@ export class AgentService implements OnApplicationBootstrap {
       createdAt: new Date(),
     });
   }
+
 }

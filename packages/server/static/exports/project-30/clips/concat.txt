@@ -1,0 +1,6 @@
+file '/Users/lsq/Desktop/openOii-Refactor/openOii-ts/packages/server/static/exports/project-30/clips/clip-01.mp4'
+file '/Users/lsq/Desktop/openOii-Refactor/openOii-ts/packages/server/static/exports/project-30/clips/clip-02.mp4'
+file '/Users/lsq/Desktop/openOii-Refactor/openOii-ts/packages/server/static/exports/project-30/clips/clip-03.mp4'
+file '/Users/lsq/Desktop/openOii-Refactor/openOii-ts/packages/server/static/exports/project-30/clips/clip-04.mp4'
+file '/Users/lsq/Desktop/openOii-Refactor/openOii-ts/packages/server/static/exports/project-30/clips/clip-05.mp4'
+file '/Users/lsq/Desktop/openOii-Refactor/openOii-ts/packages/server/static/exports/project-30/clips/clip-06.mp4'

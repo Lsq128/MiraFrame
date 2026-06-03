@@ -16,6 +16,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { DRIZZLE, type Db, schema } from "../../db";
 import { WsGateway } from "../../ws";
 import { eq, desc, asc, inArray } from "drizzle-orm";
+import { AgentService } from "../../agent";
 
 // ---- Projects CRUD ----
 
@@ -24,6 +25,7 @@ export class ProjectsController {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     @Inject(WsGateway) private readonly wsGateway: WsGateway,
+    @Inject(AgentService) private readonly agentService: AgentService,
   ) {}
 
   @Get()
@@ -67,28 +69,30 @@ export class ProjectsController {
 
   @Put(":id")
   async update(@Param("id") id: string, @Body() body: Record<string, unknown>) {
+    const patch: Partial<typeof schema.projects.$inferInsert> = compactUpdate({
+      title: body.title as string | undefined,
+      story: body.story as string | null | undefined,
+      style: body.style as string | undefined,
+      summary: body.summary as string | null | undefined,
+      status: body.status as string | undefined,
+      videoUrl: body.video_url as string | null | undefined,
+      targetShotCount: body.target_shot_count as number | null | undefined,
+      characterHints: body.character_hints as string[] | undefined,
+      creationMode: body.creation_mode as string | null | undefined,
+      referenceImages: body.reference_images as string[] | undefined,
+      outlineApproved: body.outline_approved as boolean | undefined,
+      universeId: body.universe_id as number | null | undefined,
+      chapterNumber: body.chapter_number as number | null | undefined,
+      chapterTitle: body.chapter_title as string | null | undefined,
+      textProviderOverride: body.text_provider_override as string | null | undefined,
+      imageProviderOverride: body.image_provider_override as string | null | undefined,
+      videoProviderOverride: body.video_provider_override as string | null | undefined,
+      updatedAt: new Date(),
+    });
+
     const [project] = await this.db
       .update(schema.projects)
-      .set({
-        title: body.title as string,
-        story: body.story as string,
-        style: body.style as string,
-        summary: body.summary as string,
-        status: body.status as string,
-        videoUrl: body.video_url as string,
-        targetShotCount: body.target_shot_count as number,
-        characterHints: body.character_hints as string[],
-        creationMode: body.creation_mode as string,
-        referenceImages: body.reference_images as string[],
-        outlineApproved: body.outline_approved as boolean,
-        universeId: body.universe_id as number,
-        chapterNumber: body.chapter_number as number,
-        chapterTitle: body.chapter_title as string,
-        textProviderOverride: body.text_provider_override as string,
-        imageProviderOverride: body.image_provider_override as string,
-        videoProviderOverride: body.video_provider_override as string,
-        updatedAt: new Date(),
-      } as never)
+      .set(patch)
       .where(eq(schema.projects.id, parseInt(id)))
       .returning();
 
@@ -232,4 +236,25 @@ export class ProjectsController {
     });
     return { status: "feedback_received" };
   }
+
+  @Post(":id/revisions")
+  @HttpCode(HttpStatus.ACCEPTED)
+  async revision(@Param("id") id: string, @Body() body: Record<string, unknown>) {
+    const content = String(body.content || "").trim();
+    if (!content) return { status: "ignored", reason: "empty_content" };
+
+    const runId = await this.agentService.submitRevision({
+      projectId: parseInt(id),
+      content,
+      feedbackType: typeof body.feedback_type === "string" ? body.feedback_type : undefined,
+      entityType: typeof body.entity_type === "string" ? body.entity_type : undefined,
+      entityId: typeof body.entity_id === "number" ? body.entity_id : undefined,
+    });
+
+    return { status: "revision_queued", run_id: runId };
+  }
+}
+
+function compactUpdate<T extends Record<string, unknown>>(patch: T): T {
+  return Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)) as T;
 }

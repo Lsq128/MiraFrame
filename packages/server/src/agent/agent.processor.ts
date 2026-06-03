@@ -7,11 +7,11 @@ import { DRIZZLE, type Db } from "../db";
 import { WsGateway } from "../ws";
 import { ImageService, TextService, VideoService } from "../services";
 import { buildPhase2Graph, setNodeContext, clearNodeContext, runWithNodeContext } from "@openoii/agent";
-import type { Phase2StateType } from "@openoii/agent";
 import { MemorySaver, Command, INTERRUPT, isInterrupted } from "@langchain/langgraph";
 import { and, asc, eq } from "drizzle-orm";
 import { schema } from "../db";
 import type { GenerationInput } from "./agent.service";
+import { buildInitialState, buildProjectContext } from "./agent-run-state";
 
 @Processor("generation", { concurrency: 8 })
 @Injectable()
@@ -62,17 +62,7 @@ export class AgentProcessor extends WorkerHost {
       .from(schema.projects)
       .where(eq(schema.projects.id, projectId));
 
-    const projectContext = [
-      `Project title: ${project?.title || `Project ${projectId}`}`,
-      `Visual style: ${project?.style || "anime"}`,
-      `Target shot count: ${project?.targetShotCount || 4}`,
-      project?.visualBible ? `Visual bible:\n${project.visualBible}` : null,
-      project?.storyOutline ? `Approved outline JSON:\n${JSON.stringify(project.storyOutline)}` : null,
-      "Story brief:",
-      project?.story || "No story brief provided.",
-    ]
-      .filter(Boolean)
-      .join("\n");
+    const projectContext = buildProjectContext(projectId, project, job.data);
     let latestOutline: Record<string, unknown> | null = project?.storyOutline || null;
     let latestVisualBible: string | null = project?.visualBible || null;
 
@@ -499,39 +489,7 @@ export class AgentProcessor extends WorkerHost {
     // Inject context so graph nodes can use it
     setNodeContext(ctx);
 
-    // Initial state
-    const initialStage = (job.data.targetStage as Phase2StateType["currentStage"] | undefined) || "plan_outline";
-    const initialApprovalHistory: Record<string, string> = {};
-    if (
-      initialStage === "plan_characters" ||
-      initialStage === "plan_shots" ||
-      initialStage === "render_shot_images" ||
-      initialStage === "compose_videos"
-    ) {
-      initialApprovalHistory.outline = "approved";
-    }
-    if (initialStage === "plan_shots" || initialStage === "render_shot_images" || initialStage === "compose_videos") {
-      initialApprovalHistory.characters = "approved";
-    }
-    if (initialStage === "render_shot_images" || initialStage === "compose_videos") {
-      initialApprovalHistory.shots = "approved";
-    }
-
-    const initialState: Phase2StateType = {
-      projectId: String(projectId),
-      runId: String(runId),
-      threadId,
-      currentStage: initialStage,
-      nextStage: null,
-      stageHistory: [],
-      approvalHistory: initialApprovalHistory,
-      critiqueScores: {},
-      critiqueRound: 0,
-      artifactLineage: {},
-      routeStage: null,
-      routeMode: "full",
-      reviewRequested: false,
-    };
+    const initialState = buildInitialState(job.data);
 
     try {
       await runWithNodeContext(ctx, async () => {

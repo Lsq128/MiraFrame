@@ -12,6 +12,7 @@ import type {
   StoryOutlineUpdatePayload,
   Message,
   AgentRun,
+  ProjectRevisionPayload,
 } from "@/types";
 
 export const projectsApi = {
@@ -139,6 +140,12 @@ export const projectsApi = {
         }),
       },
     ),
+
+  submitRevision: (id: number, data: ProjectRevisionPayload) =>
+    fetchApi<{ status: string; run_id?: number }>(`/api/v1/projects/${id}/revisions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };
 
 type ServerProject = Project & {

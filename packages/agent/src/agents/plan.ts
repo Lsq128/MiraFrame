@@ -7,13 +7,23 @@ export class PlanAgent extends BaseAgent {
     super("plan");
   }
 
-  async runCharacters(ctx: AgentContext, _state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  async runCharacters(ctx: AgentContext, state: Phase2StateType): Promise<Partial<Phase2StateType>> {
     await ctx.sendMessage("开始生成角色设计...", { progress: 0.25, isLoading: true, stage: "plan_characters" });
     await ctx.sendThinking("planning", "基于故事大纲设计角色...");
 
+    const userPrompt = state.feedback
+      ? [
+          "Revise the character designs according to the current user feedback.",
+          "Keep continuity with the approved outline and existing project context.",
+          "If the feedback targets one character, preserve unrelated characters unless a change is necessary.",
+          `Feedback: ${state.feedback}`,
+          "Output ONLY valid JSON.",
+        ].join("\n")
+      : "Design 2-4 main characters for this story. Output ONLY valid JSON.";
+
     const response = await ctx.callLlm(
       CHARACTER_SYSTEM_PROMPT,
-      "Design 2-4 main characters for this story. Output ONLY valid JSON.",
+      userPrompt,
       { maxTokens: 4096 },
     );
 
@@ -54,13 +64,25 @@ export class PlanAgent extends BaseAgent {
     };
   }
 
-  async runShots(ctx: AgentContext, _state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  async runShots(ctx: AgentContext, state: Phase2StateType): Promise<Partial<Phase2StateType>> {
     await ctx.sendMessage("开始生成分镜脚本...", { progress: 0.45, isLoading: true, stage: "plan_shots" });
     await ctx.sendThinking("planning", "分析叙事节奏，设计镜头语言...");
 
+    const userPrompt = state.feedback
+      ? [
+          "Revise the storyboard according to the current user feedback.",
+          "Keep continuity with the approved outline, existing characters, and unaffected shots.",
+          state.entityType === "shot" && state.entityId
+            ? `The feedback targets shot entity id ${state.entityId}. Keep unrelated shots stable when possible.`
+            : "If the feedback is broad, regenerate the shot plan for the affected stage.",
+          `Feedback: ${state.feedback}`,
+          "Output ONLY valid JSON.",
+        ].join("\n")
+      : "Create 4-8 shot scripts based on the characters and outline. Output ONLY valid JSON.";
+
     const response = await ctx.callLlm(
       SHOT_SYSTEM_PROMPT,
-      "Create 4-8 shot scripts based on the characters and outline. Output ONLY valid JSON.",
+      userPrompt,
       { maxTokens: 4096 },
     );
 

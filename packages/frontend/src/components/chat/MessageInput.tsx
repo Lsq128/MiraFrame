@@ -6,6 +6,7 @@ interface MessageInputProps {
   onSend: () => void;
   disabled?: boolean;
   placeholder?: string;
+  buttonLabel?: string;
 }
 
 export function MessageInput({
@@ -14,6 +15,7 @@ export function MessageInput({
   onSend,
   disabled = false,
   placeholder = "输入反馈或直接回车发送...",
+  buttonLabel = "发送",
 }: MessageInputProps) {
   return (
     <div className="flex gap-2 p-2 border-t border-base-300">
@@ -36,7 +38,7 @@ export function MessageInput({
         onClick={onSend}
         disabled={disabled || !value.trim()}
       >
-        发送
+        {buttonLabel}
       </button>
     </div>
   );

@@ -188,6 +188,24 @@ export interface StoryOutlineUpdatePayload {
   outline_approved?: boolean | null;
 }
 
+export type RevisionEntityType = "outline" | "character" | "characters" | "shots" | "shot" | "project_video";
+export type RevisionFeedbackType =
+  | "rewrite"
+  | "regenerate"
+  | "regenerate_image"
+  | "regenerate_video"
+  | "style"
+  | "motion"
+  | "dialogue"
+  | "script";
+
+export interface ProjectRevisionPayload {
+  content: string;
+  feedback_type?: RevisionFeedbackType;
+  entity_type?: RevisionEntityType;
+  entity_id?: number;
+}
+
 // --- Character ---
 export interface Character {
   id: number;

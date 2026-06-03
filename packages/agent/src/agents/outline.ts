@@ -1,17 +1,23 @@
 import { BaseAgent, type AgentContext } from "./base.js";
 import type { Phase2StateType } from "../state.js";
-import { OUTLINE_SYSTEM_PROMPT } from "../prompts/outline.js";
+import { OUTLINE_FEEDBACK_PROMPT, OUTLINE_SYSTEM_PROMPT } from "../prompts/outline.js";
 
 export class OutlineAgent extends BaseAgent {
   constructor() {
     super("outline");
   }
 
-  async run(ctx: AgentContext, _state: Phase2StateType): Promise<Partial<Phase2StateType>> {
+  async run(ctx: AgentContext, state: Phase2StateType): Promise<Partial<Phase2StateType>> {
     await this.sendMessage(ctx, "开始生成故事大纲...", { progress: 0.05, isLoading: true, stage: "plan_outline" });
     await this.sendThinking(ctx, "planning", "分析故事要素：主题、世界观、情感弧线...");
 
-    const outline = await this.callLlm(ctx, OUTLINE_SYSTEM_PROMPT, "请根据提供的故事创想生成一份详细的故事大纲。必须全部使用中文输出。", { maxTokens: 4096 });
+    const userPrompt = state.feedback
+      ? OUTLINE_FEEDBACK_PROMPT
+        .replace("{originalOutline}", "请参考项目上下文中的 Approved outline JSON；如果没有原大纲，则根据 Story brief 生成。")
+        .replace("{feedback}", state.feedback)
+      : "请根据提供的故事创想生成一份详细的故事大纲。必须全部使用中文输出。";
+
+    const outline = await this.callLlm(ctx, OUTLINE_SYSTEM_PROMPT, userPrompt, { maxTokens: 4096 });
 
     // Parse outline from LLM response
     let storyOutline: Record<string, unknown> = {};

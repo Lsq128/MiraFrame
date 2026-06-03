@@ -5,37 +5,15 @@ import { CheckCircle2, Clapperboard, FileText, Sparkles, Users } from "lucide-re
 import type { LucideIcon } from "lucide-react";
 import type { AgentMessage } from "@/types";
 import { AGENT_NAME_MAP } from "@/types";
-import { useShotStore } from "@/stores/shotStore";
 import { cn } from "@/lib/utils";
 
 interface MessageListProps {
   messages: AgentMessage[];
 }
 
-// Simplified retry — full shotApi import when services are ready
-async function retryShotRegeneration(shotId: number, retryType: "image" | "video") {
-  const { fetchApi } = await import("@/services/client");
-  return fetchApi(`/api/v1/shots/${shotId}/regenerate`, {
-    method: "POST",
-    body: JSON.stringify({ type: retryType }),
-  });
-}
-
-function parseShotError(content: string, shots: ReturnType<typeof useShotStore.getState>["shots"]) {
-  const match = content.match(/镜头\s*(\d+)/);
-  if (!match) return null;
-  const shotOrder = parseInt(match[1]);
-  const shot = shots.find((s) => s.order === shotOrder);
-  if (!shot) return null;
-  const retryType = content.includes("视频") ? "video" : "image";
-  return { shotId: shot.id, shotOrder, retryType };
-}
-
 export function MessageList({ messages }: MessageListProps) {
-  const shots = useShotStore((s) => s.shots);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [completedTypewriters, setCompletedTypewriters] = useState<Set<string>>(new Set());
-  const [retryingShots, setRetryingShots] = useState<Set<number>>(new Set());
   const messageFirstSeenRef = useRef<Map<string, number>>(new Map());
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -69,24 +47,6 @@ export function MessageList({ messages }: MessageListProps) {
   const handleTypewriterComplete = useCallback((id: string) => {
     setCompletedTypewriters((prev) => new Set(prev).add(id));
   }, []);
-
-  const handleShotRetry = useCallback(
-    async (shotId: number, retryType: "image" | "video") => {
-      setRetryingShots((prev) => new Set(prev).add(shotId));
-      try {
-        await retryShotRegeneration(shotId, retryType);
-      } catch {
-        // Silently handle
-      } finally {
-        setRetryingShots((prev) => {
-          const next = new Set(prev);
-          next.delete(shotId);
-          return next;
-        });
-      }
-    },
-    [],
-  );
 
   const shouldFilterOut = useCallback((msg: AgentMessage): boolean => {
     if (msg.role === "info" && msg.agent === "system") return true;
@@ -143,7 +103,6 @@ export function MessageList({ messages }: MessageListProps) {
         }
 
         const isCollapsed = msg.id && collapsed.has(msg.id);
-        const shotInfo = parseShotError(msg.content, shots);
         const structured = getStructuredMessage(msg);
 
         return (
@@ -213,20 +172,6 @@ export function MessageList({ messages }: MessageListProps) {
                   </button>
                 )}
 
-                {/* Shot retry */}
-                {shotInfo && (
-                  <button
-                    onClick={() => handleShotRetry(shotInfo.shotId, shotInfo.retryType as "image" | "video")}
-                    disabled={retryingShots.has(shotInfo.shotId)}
-                    className="btn btn-xs btn-outline btn-warning mt-2"
-                  >
-                    {retryingShots.has(shotInfo.shotId) ? (
-                      <span className="loading loading-spinner loading-xs" />
-                    ) : (
-                      `重新生成${shotInfo.retryType === "video" ? "视频" : "图像"}`
-                    )}
-                  </button>
-                )}
               </div>
             )}
           </div>

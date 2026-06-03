@@ -16,7 +16,7 @@ interface ChatDrawerProps {
 }
 
 /**
- * ChatDrawer — conditional render when open, but auto-opens when generation starts
+ * ChatDrawer — generation log drawer that auto-opens when generation starts
  * or when user clicks the toggle button in the pipeline area.
  *
  * WS events always reach stores via getState() regardless of whether ChatPanel is mounted.
@@ -42,9 +42,9 @@ export function ChatDrawer(props: ChatDrawerProps) {
         <button
           onClick={open}
           className="flex-1 flex items-center justify-center hover:bg-base-200 transition-colors"
-          title="打开对话面板"
+          title="打开生成日志"
         >
-          <span className="text-xs [writing-mode:vertical-rl]">对话</span>
+          <span className="text-xs [writing-mode:vertical-rl]">日志</span>
         </button>
         {awaitingConfirm && (
           <span className="w-2 h-2 rounded-full bg-warning animate-pulse mx-auto mb-1" />
@@ -56,11 +56,12 @@ export function ChatDrawer(props: ChatDrawerProps) {
   return (
     <div className="flex flex-col w-[360px] bg-base-100 border-l border-base-300">
       {/* Header */}
-      <div className="flex justify-end px-2 py-1 border-b border-base-200">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-base-200">
+        <span className="text-xs font-medium text-muted-foreground">生成日志</span>
         <button
           onClick={close}
           className="btn btn-xs btn-circle btn-ghost"
-          aria-label="关闭对话面板"
+          aria-label="关闭生成日志"
         >
           ✕
         </button>
@@ -68,7 +69,10 @@ export function ChatDrawer(props: ChatDrawerProps) {
 
       {/* Body */}
       <div className="flex-1 overflow-hidden">
-        <ChatPanel {...props} />
+        <ChatPanel
+          onCancel={props.onCancel}
+          isGenerating={props.isGenerating}
+        />
       </div>
     </div>
   );

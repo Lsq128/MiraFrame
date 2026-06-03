@@ -11,6 +11,7 @@ import {
 } from "@nestjs/common";
 import { DRIZZLE, type Db, schema } from "../../db";
 import { WsGateway } from "../../ws";
+import { AgentService } from "../../agent";
 import { eq, asc } from "drizzle-orm";
 
 @Controller("api/v1/shots")
@@ -18,30 +19,33 @@ export class ShotsController {
   constructor(
     @Inject(DRIZZLE) private readonly db: Db,
     @Inject(WsGateway) private readonly wsGateway: WsGateway,
+    @Inject(AgentService) private readonly agentService: AgentService,
   ) {}
 
   @Put(":id")
   async update(@Param("id") id: string, @Body() body: Record<string, unknown>) {
+    const patch: Partial<typeof schema.shots.$inferInsert> = compactUpdate({
+      order: body.order as number | undefined,
+      description: body.description as string | undefined,
+      prompt: body.prompt as string | null | undefined,
+      imagePrompt: body.image_prompt as string | null | undefined,
+      duration: body.duration as number | null | undefined,
+      camera: body.camera as string | null | undefined,
+      motionNote: body.motion_note as string | null | undefined,
+      scene: body.scene as string | null | undefined,
+      action: body.action as string | null | undefined,
+      expression: body.expression as string | null | undefined,
+      lighting: body.lighting as string | null | undefined,
+      dialogue: body.dialogue as string | null | undefined,
+      sfx: body.sfx as string | null | undefined,
+      seed: body.seed as number | null | undefined,
+      characterIds: body.character_ids as number[] | undefined,
+      updatedAt: new Date(),
+    });
+
     const [shot] = await this.db
       .update(schema.shots)
-      .set({
-        order: body.order as number,
-        description: body.description as string,
-        prompt: body.prompt as string,
-        imagePrompt: body.image_prompt as string,
-        duration: body.duration as number,
-        camera: body.camera as string,
-        motionNote: body.motion_note as string,
-        scene: body.scene as string,
-        action: body.action as string,
-        expression: body.expression as string,
-        lighting: body.lighting as string,
-        dialogue: body.dialogue as string,
-        sfx: body.sfx as string,
-        seed: body.seed as number,
-        characterIds: body.character_ids as number[],
-        updatedAt: new Date(),
-      })
+      .set(patch)
       .where(eq(schema.shots.id, parseInt(id)))
       .returning();
 
@@ -90,16 +94,30 @@ export class ShotsController {
   @Post(":id/regenerate")
   @HttpCode(HttpStatus.ACCEPTED)
   async regenerate(@Param("id") id: string, @Body() body: { type?: string }) {
+    const shotId = parseInt(id);
     const [shot] = await this.db
-      .select({ projectId: schema.shots.projectId })
+      .select({ projectId: schema.shots.projectId, order: schema.shots.order })
       .from(schema.shots)
-      .where(eq(schema.shots.id, parseInt(id)));
+      .where(eq(schema.shots.id, shotId));
+    if (!shot) return { error: "Not found" };
+
+    const type = body.type === "video" ? "video" : "image";
+    const runId = await this.agentService.submitRevision({
+      projectId: shot.projectId,
+      content: type === "video"
+        ? `重新生成镜头 ${shot.order} 的视频，保持分镜含义一致。`
+        : `重新生成镜头 ${shot.order} 的首帧画面，保持分镜含义一致。`,
+      entityType: "shot",
+      entityId: shotId,
+      feedbackType: type === "video" ? "regenerate_video" : "regenerate_image",
+    });
 
     return {
       status: "queued",
-      shot_id: parseInt(id),
-      project_id: shot?.projectId,
-      type: body.type || "image",
+      shot_id: shotId,
+      project_id: shot.projectId,
+      type,
+      run_id: runId,
     };
   }
 
@@ -135,4 +153,8 @@ export class ShotsController {
       });
     }
   }
+}
+
+function compactUpdate<T extends Record<string, unknown>>(patch: T): T {
+  return Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)) as T;
 }

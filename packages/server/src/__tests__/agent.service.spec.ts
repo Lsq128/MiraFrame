@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Test, TestingModule } from "@nestjs/testing";
 import { AgentService } from "../agent/agent.service";
+import { RevisionService } from "../agent/revision.service";
 import { WsGateway } from "../ws";
 
 describe("AgentService", () => {
@@ -35,6 +36,15 @@ describe("AgentService", () => {
         {
           provide: WsGateway,
           useValue: { sendToProject: () => {} },
+        },
+        {
+          provide: RevisionService,
+          useValue: {
+            targetStageFor: () => "plan_outline",
+            prepareAssets: async () => {},
+            formatUserMessage: () => "feedback",
+            formatAcceptedMessage: () => "accepted",
+          },
         },
       ],
     }).compile();
