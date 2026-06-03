@@ -34,6 +34,8 @@ function getApiBase(): string {
 
 // Resolve once at module load
 const API_BASE = getApiBase();
+const ADMIN_TOKEN_STORAGE_KEY = "miraframe_admin_token";
+const LEGACY_ADMIN_TOKEN_STORAGE_KEY = "openoii_admin_token";
 
 // ---------------------------------------------------------------------------
 // getStaticUrl - safely convert relative /static/... paths to full URLs
@@ -90,7 +92,10 @@ export async function fetchApi<T>(
     // Read admin token from localStorage (non-critical - wrap in try/catch)
     let adminToken: string | null = null;
     try {
-      adminToken = localStorage.getItem("openoii_admin_token");
+      adminToken = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || localStorage.getItem(LEGACY_ADMIN_TOKEN_STORAGE_KEY);
+      if (!localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) && adminToken) {
+        localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, adminToken);
+      }
     } catch { /* localStorage unavailable (SSR / worker env) */ }
 
     const res = await fetch(`${API_BASE}${endpoint}`, {

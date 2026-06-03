@@ -9,7 +9,7 @@ import { registerAs } from "@nestjs/config";
 
 export const appConfig = registerAs("app", () => ({
   // ── 基础 ──
-  appName: process.env.APP_NAME || "openOii-backend",
+  appName: process.env.APP_NAME || "MiraFrame-backend",
   environment: process.env.NODE_ENV || "dev",
   logLevel: process.env.LOG_LEVEL || "info",
   port: parseInt(process.env.PORT || "3000", 10),
@@ -21,7 +21,7 @@ export const appConfig = registerAs("app", () => ({
   // ── 数据库 ──
   databaseUrl:
     process.env.DATABASE_URL ||
-    "postgres://postgres:postgres@localhost:5432/openoii",
+    "postgres://postgres:postgres@localhost:5432/miraframe",
 
   // ── Redis ──
   redisUrl: process.env.REDIS_URL || "redis://localhost:6379/0",

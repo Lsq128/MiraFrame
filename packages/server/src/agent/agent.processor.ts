@@ -6,7 +6,7 @@ import { REDIS_CLIENT, REDIS_SUBSCRIBER } from "../redis";
 import { DRIZZLE, type Db } from "../db";
 import { WsGateway } from "../ws";
 import { ImageService, TextService, VideoService } from "../services";
-import { buildPhase2Graph, setNodeContext, clearNodeContext, runWithNodeContext } from "@openoii/agent";
+import { buildPhase2Graph, setNodeContext, clearNodeContext, runWithNodeContext } from "@miraframe/agent";
 import { MemorySaver, Command, INTERRUPT, isInterrupted } from "@langchain/langgraph";
 import { and, asc, eq } from "drizzle-orm";
 import { schema } from "../db";

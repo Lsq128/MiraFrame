@@ -10,8 +10,8 @@ RUN pnpm install --frozen-lockfile --prod false
 COPY packages/shared/ packages/shared/
 COPY packages/frontend/ packages/frontend/
 
-RUN pnpm --filter @openoii/shared build
-RUN pnpm --filter @openoii/frontend build
+RUN pnpm --filter @miraframe/shared build
+RUN pnpm --filter @miraframe/frontend build
 
 FROM nginx:alpine
 COPY --from=builder /app/packages/frontend/dist /usr/share/nginx/html

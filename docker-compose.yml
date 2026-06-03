@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: openoii
+      POSTGRES_DB: miraframe
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
@@ -34,7 +34,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-postgres}@postgres:5432/openoii
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-postgres}@postgres:5432/miraframe
       REDIS_URL: redis://redis:6379/0
       NODE_ENV: production
     depends_on:

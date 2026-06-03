@@ -16,7 +16,7 @@ export const DRIZZLE = "DRIZZLE";
         const connectionString =
           config.get<string>("app.databaseUrl") ||
           config.get<string>("DATABASE_URL") ||
-          "postgres://postgres:postgres@localhost:5432/openoii";
+          "postgres://postgres:postgres@localhost:5432/miraframe";
         const client = postgres(connectionString, { max: 10 });
         return drizzle(client, { schema });
       },

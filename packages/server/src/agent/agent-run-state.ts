@@ -1,4 +1,4 @@
-import type { Phase2StateType } from "@openoii/agent";
+import type { Phase2StateType } from "@miraframe/agent";
 import type { GenerationInput } from "./agent.service";
 
 export interface AgentProjectSnapshot {

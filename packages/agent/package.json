@@ -1,5 +1,5 @@
 {
-  "name": "@openoii/agent",
+  "name": "@miraframe/agent",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
   "dependencies": {
     "@langchain/core": "^1.0.0",
     "@langchain/langgraph": "^1.0.0",
-    "@openoii/shared": "workspace:*"
+    "@miraframe/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

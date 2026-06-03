@@ -41,6 +41,73 @@
 }
 
 @layer base {
+  :root,
+  [data-theme="light"] {
+    color-scheme: light;
+    --color-primary: #2563eb;
+    --color-primary-foreground: #ffffff;
+    --color-secondary: #14b8a6;
+    --color-secondary-foreground: #042f2e;
+    --color-destructive: #ef4444;
+    --color-destructive-foreground: #ffffff;
+    --color-muted: #64748b;
+    --color-muted-foreground: #64748b;
+    --color-accent: #fff7ed;
+    --color-accent-foreground: #172033;
+    --color-card: #ffffff;
+    --color-card-foreground: #172033;
+    --color-border: #dbe3ee;
+    --color-input: #dbe3ee;
+    --color-ring: #2563eb;
+    --color-background: #f6f7fb;
+    --color-foreground: #172033;
+    --color-base-100: #ffffff;
+    --color-base-200: #f3f6fb;
+    --color-base-300: #dbe3ee;
+    --color-base-content: #172033;
+    --color-success: #16a34a;
+    --color-success-content: #ffffff;
+    --color-warning: #f97316;
+    --color-warning-content: #ffffff;
+    --color-error: #dc2626;
+    --color-error-content: #ffffff;
+    --color-info: #0ea5e9;
+    --color-info-content: #ffffff;
+  }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --color-primary: #60a5fa;
+    --color-primary-foreground: #07111f;
+    --color-secondary: #2dd4bf;
+    --color-secondary-foreground: #042f2e;
+    --color-destructive: #f87171;
+    --color-destructive-foreground: #2b0707;
+    --color-muted: #94a3b8;
+    --color-muted-foreground: #94a3b8;
+    --color-accent: #1f2937;
+    --color-accent-foreground: #e5e7eb;
+    --color-card: #111827;
+    --color-card-foreground: #e5e7eb;
+    --color-border: #334155;
+    --color-input: #334155;
+    --color-ring: #60a5fa;
+    --color-background: #0b1020;
+    --color-foreground: #e5e7eb;
+    --color-base-100: #111827;
+    --color-base-200: #1f2937;
+    --color-base-300: #334155;
+    --color-base-content: #e5e7eb;
+    --color-success: #22c55e;
+    --color-success-content: #052e16;
+    --color-warning: #fb923c;
+    --color-warning-content: #431407;
+    --color-error: #f87171;
+    --color-error-content: #450a0a;
+    --color-info: #38bdf8;
+    --color-info-content: #082f49;
+  }
+
   * {
     @apply border-border;
   }

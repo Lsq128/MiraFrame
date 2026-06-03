@@ -1,5 +1,5 @@
 {
-  "name": "openoii-ts",
+  "name": "miraframe",
   "private": true,
   "packageManager": "pnpm@9.12.0",
   "scripts": {

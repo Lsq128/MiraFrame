@@ -174,7 +174,7 @@ function buildCompositionHtml(clipUrls: string[]): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>openOii 合成预览</title>
+  <title>MiraFrame 合成预览</title>
   <style>
     body{margin:0;background:#101114;color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     main{min-height:100vh;display:grid;place-items:center;padding:24px}

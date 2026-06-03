@@ -4,6 +4,9 @@
 import { fetchApi } from "./client";
 import type { ConfigItem, ConfigValue } from "@/types";
 
+const ADMIN_TOKEN_STORAGE_KEY = "miraframe_admin_token";
+const LEGACY_ADMIN_TOKEN_STORAGE_KEY = "openoii_admin_token";
+
 export const configApi = {
   get: () => fetchApi<ConfigItem[]>("/api/v1/config"),
 
@@ -28,9 +31,11 @@ export const configApi = {
       if ("ADMIN_TOKEN" in config) {
         const token = config.ADMIN_TOKEN;
         if (typeof token === "string" && token.length > 0) {
-          localStorage.setItem("openoii_admin_token", token);
+          localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+          localStorage.removeItem(LEGACY_ADMIN_TOKEN_STORAGE_KEY);
         } else {
-          localStorage.removeItem("openoii_admin_token");
+          localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+          localStorage.removeItem(LEGACY_ADMIN_TOKEN_STORAGE_KEY);
         }
       }
       return res;

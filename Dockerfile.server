@@ -15,9 +15,9 @@ COPY packages/agent/ packages/agent/
 COPY packages/server/ packages/server/
 
 # Build shared -> agent -> server
-RUN pnpm --filter @openoii/shared build
-RUN pnpm --filter @openoii/agent build
-RUN pnpm --filter @openoii/server build
+RUN pnpm --filter @miraframe/shared build
+RUN pnpm --filter @miraframe/agent build
+RUN pnpm --filter @miraframe/server build
 
 # Production image
 FROM node:22-alpine AS production

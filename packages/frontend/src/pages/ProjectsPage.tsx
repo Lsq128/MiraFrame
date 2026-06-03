@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectsApi } from "@/services/projectsApi";
 import { useThemeStore } from "@/stores/themeStore";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { cn } from "@/lib/utils";
+import { GenerationServiceNotice } from "@/components/settings/GenerationServiceNotice";
 import { BRAND } from "@/lib/brand";
 import { Moon, Settings, Sparkles, Sun, Trash2 } from "lucide-react";
 import type { Project } from "@/types";
@@ -15,9 +15,8 @@ export default function ProjectsPage() {
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<number[] | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const { theme, toggleTheme } = useThemeStore();
+  const { isDark, toggleTheme } = useThemeStore();
   const { openModal: openSettings } = useSettingsStore();
-  const isDark = theme.includes("dark");
 
   const { data: projects, isLoading, error } = useQuery({
     queryKey: ["projects"],
@@ -92,6 +91,7 @@ export default function ProjectsPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-semibold mb-2">全部项目</h1>
           <p className="mb-4 text-sm text-muted-foreground">管理 {BRAND.cnName} 里的漫剧项目与生成记录。</p>
+          <GenerationServiceNotice />
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
               <input

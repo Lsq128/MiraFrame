@@ -7,9 +7,8 @@ import { BRAND } from "@/lib/brand";
 import { FolderKanban, Settings, Sparkles, Sun, Moon } from "lucide-react";
 
 export function TopBar() {
-  const { theme, toggleTheme } = useThemeStore();
+  const { isDark, toggleTheme } = useThemeStore();
   const { openModal: openSettings } = useSettingsStore();
-  const isDark = theme.includes("dark");
 
   return (
     <header className="flex-shrink-0 flex items-center h-11 bg-base-100/95 backdrop-blur border-b border-base-300 z-30 px-3">

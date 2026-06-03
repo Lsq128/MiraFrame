@@ -87,7 +87,7 @@ export function isTaskVideoUrl(url?: string | null): boolean {
 }
 
 export function isInternalCompositionUrl(url?: string | null): boolean {
-  return !!url && url.startsWith("openoii:composition:");
+  return !!url && (url.startsWith("miraframe:composition:") || url.startsWith("openoii:composition:"));
 }
 
 export function isFinalVideoUrl(url?: string | null): boolean {

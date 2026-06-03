@@ -1,5 +1,5 @@
 import { Annotation } from "@langchain/langgraph";
-import type { Phase2Stage } from "@openoii/shared";
+import type { Phase2Stage } from "@miraframe/shared";
 
 export const Phase2State = Annotation.Root({
   projectId: Annotation<string>(),

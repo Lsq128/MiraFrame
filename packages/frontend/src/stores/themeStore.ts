@@ -1,43 +1,59 @@
 import { create } from "zustand";
 
-type Theme = "light" | "dark" | "cupcake" | "bumblebee" | "emerald" | "corporate" | "synthwave" | "retro" | "cyberpunk" | "valentine" | "halloween" | "garden" | "forest" | "aqua" | "lofi" | "pastel" | "fantasy" | "wireframe" | "black" | "luxury" | "dracula" | "cmyk" | "autumn" | "business" | "acid" | "lemonade" | "night" | "coffee" | "winter" | "dim" | "nord" | "sunset" | "light-dark" | "dark-light";
+export type Theme = "light" | "dark";
+
+const THEME_STORAGE_KEY = "miraframe-theme";
+const LEGACY_THEME_STORAGE_KEY = "openoii-theme";
 
 interface ThemeState {
   theme: Theme;
+  isDark: boolean;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
 }
 
-// Initialize from localStorage or default to "light-dark" (auto)
 function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "light-dark";
-  const stored = localStorage.getItem("openoii-theme");
-  if (stored) return stored as Theme;
-  // Detect system preference
-  if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-    return "dark-light";
-  }
-  return "light-dark";
+  if (typeof window === "undefined") return "light";
+  const stored = localStorage.getItem(THEME_STORAGE_KEY) || localStorage.getItem(LEGACY_THEME_STORAGE_KEY);
+  if (stored) return normalizeTheme(stored);
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function normalizeTheme(theme: string | null): Theme {
+  if (theme === "dark" || theme === "dark-light" || theme === "night" || theme === "black") return "dark";
+  if (theme === "light" || theme === "light-dark") return "light";
+  return "light";
+}
+
+function applyTheme(theme: Theme): void {
+  if (typeof document === "undefined") return;
+  document.documentElement.setAttribute("data-theme", theme);
+  document.documentElement.classList.toggle("dark", theme === "dark");
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
   theme: getInitialTheme(),
+  isDark: getInitialTheme() === "dark",
 
   setTheme: (theme) => {
-    localStorage.setItem("openoii-theme", theme);
-    document.documentElement.setAttribute("data-theme", theme);
-    set({ theme });
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    localStorage.removeItem(LEGACY_THEME_STORAGE_KEY);
+    applyTheme(theme);
+    set({ theme, isDark: theme === "dark" });
   },
 
   toggleTheme: () => {
-    const current = get().theme;
-    const next = current.endsWith("dark") || current.includes("dark") ? "light" : "dark";
+    const next = get().theme === "dark" ? "light" : "dark";
     get().setTheme(next);
   },
 }));
 
-// Apply theme on load
 if (typeof window !== "undefined") {
-  const theme = getInitialTheme();
-  document.documentElement.setAttribute("data-theme", theme);
+  applyTheme(getInitialTheme());
+  window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener("change", (event) => {
+    const hasUserTheme = localStorage.getItem(THEME_STORAGE_KEY) || localStorage.getItem(LEGACY_THEME_STORAGE_KEY);
+    if (hasUserTheme) return;
+    useThemeStore.getState().setTheme(event.matches ? "dark" : "light");
+    localStorage.removeItem(THEME_STORAGE_KEY);
+  });
 }
